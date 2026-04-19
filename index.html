@@ -3,13 +3,19 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0d4f3c">
 <title>The World School — Timetable Studio</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
   :root{--bg:#f6f3ec;--paper:#fbf9f3;--ink:#1a1f1c;--ink-soft:#4a544d;--ink-muted:#8a8f88;--line:#e3ddcf;--line-soft:#ebe6da;--accent:#0d4f3c;--accent-soft:#1a6b54;--warm:#b8651f;--warm-soft:#d97a26;--danger:#9a2a2a;--danger-soft:#fde2e2}
   *{box-sizing:border-box;margin:0;padding:0}
@@ -27,9 +33,15 @@
   .app{display:flex;min-height:100vh}
   .sidebar{width:240px;background:var(--paper);border-right:1px solid var(--line);padding:28px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
   .brand{padding:0 28px 24px;border-bottom:1px solid var(--line)}
+  .brand .school-logo{width:56px;height:56px;border-radius:8px;overflow:hidden;background:var(--bg);margin-bottom:12px;display:flex;align-items:center;justify-content:center}
+  .brand .school-logo img{width:100%;height:100%;object-fit:contain}
   .brand .mark{font-size:11px;letter-spacing:0.18em;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px}
   .brand .name{font-size:24px;line-height:1.1;color:var(--ink)}
   .brand .name em{font-style:italic;color:var(--accent)}
+  .logo-uploader{width:120px;height:120px;border:2px dashed var(--line);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:var(--bg);overflow:hidden;transition:border-color .15s}
+  .logo-uploader:hover{border-color:var(--accent)}
+  .logo-uploader img{width:100%;height:100%;object-fit:contain}
+  .logo-uploader .placeholder{font-size:11px;color:var(--ink-muted);text-align:center;padding:8px}
   .nav{padding:20px 14px;flex:1}
   .nav-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:6px;color:var(--ink-soft);font-size:13.5px;font-weight:500;width:100%;text-align:left;transition:all .15s;margin-bottom:2px}
   .nav-item:hover{background:var(--line-soft);color:var(--ink)}
@@ -179,6 +191,13 @@
 </head>
 <body>
 <div id="root"></div>
+<script>
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+</script>
 <script type="text/babel">
 const {useState, useEffect, useMemo, useCallback, useRef} = React;
 const STORAGE_KEY = 'tws_timetable_v7';
@@ -306,6 +325,7 @@ const SESSION_PRESETS = {
 
 const DEFAULT_DATA = {
   school:{days:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],activeSession:'normal',
+    name:'The World School, ICSE',tagline:'Bhusawal | Kolte Foundation Educational Institution',logo:'',
     primaryPeriods:SESSION_PRESETS.normal.primary.periods.map(p=>({...p})),
     upperPeriods:SESSION_PRESETS.normal.upper.periods.map(p=>({...p}))},
   classes:DEFAULT_CLASSES, teachers:DEFAULT_TEACHERS, subjects:ICSE_SUBJECTS, qualMaster:DEFAULT_QUAL_MASTER,
@@ -351,6 +371,7 @@ function migrateData(old){
   if(old.classes) old.classes=old.classes.map(c=>c.group?c:{...c,group:c.name.match(/^[1-4]/)?'primary':'upper'});
   if(old.school&&old.school.periods&&!old.school.primaryPeriods){old.school.primaryPeriods=old.school.periods;old.school.upperPeriods=old.school.periods;}
   if(old.school&&!old.school.activeSession) old.school.activeSession='normal';
+  if(old.school){if(typeof old.school.logo==='undefined')old.school.logo='';if(!old.school.name)old.school.name='The World School, ICSE';if(typeof old.school.tagline==='undefined')old.school.tagline='Bhusawal | Kolte Foundation Educational Institution';}
   if(!old.qualMaster) old.qualMaster=DEFAULT_QUAL_MASTER.map(q=>({...q}));
   if(!old.rooms) old.rooms=[{id:'r1',name:'Classroom 1'},{id:'r2',name:'Classroom 2'},{id:'r3',name:'Computer Lab'},{id:'r4',name:'Library'},{id:'r5',name:'Playground'}];
   if(old.teachers) old.teachers=migrateTeachers(old.teachers, old.qualMaster);
@@ -374,13 +395,18 @@ function saveAsHTMLFile(data){const n=prompt('Save timetable file as:','TWS_Time
 function importJSON(cb){const i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=migrateData(JSON.parse(ev.target.result));if(d.school&&d.classes&&d.teachers)cb(d);else alert('Invalid file.');}catch(e){alert('Parse error.');}};r.readAsText(f);};i.click();}
 
 // ====== Section Export (Print / PDF / Excel / Word) ======
+function getBranding(){
+  try{const raw=localStorage.getItem(STORAGE_KEY);if(raw){const d=JSON.parse(raw);if(d&&d.school)return{logo:d.school.logo||'',name:d.school.name||'The World School, ICSE',tagline:d.school.tagline||'Bhusawal | Kolte Foundation Educational Institution'};}}catch(e){}
+  return{logo:'',name:'The World School, ICSE',tagline:'Bhusawal | Kolte Foundation Educational Institution'};
+}
 function buildExportHTML(title, headers, rows, subtitle){
   const date = new Date().toLocaleDateString('en-IN');
-  let h = '<html><head><meta charset="utf-8"><title>'+title+'</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#1a1f1c}h1{font-size:20px;margin:0 0 4px}h2{font-size:13px;color:#666;font-weight:400;margin:0 0 16px}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#f0f0f0;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;border:1px solid #ccc}td{padding:8px 10px;border:1px solid #ddd;font-size:13px;vertical-align:top}.footer{margin-top:20px;font-size:10px;color:#999;text-align:center}</style></head><body>';
-  h += '<h1>The World School, ICSE – '+title+'</h1><h2>'+(subtitle||'')+' | Generated: '+date+'</h2>';
+  const b = getBranding();
+  let h = '<html><head><meta charset="utf-8"><title>'+title+'</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#1a1f1c}.head{display:flex;align-items:center;gap:14px;border-bottom:2px solid #0d4f3c;padding-bottom:12px;margin-bottom:16px}.head img{width:54px;height:54px;object-fit:contain}h1{font-size:20px;margin:0 0 4px;color:#0d4f3c}h2{font-size:13px;color:#666;font-weight:400;margin:0 0 4px}h3{font-size:12px;color:#666;font-weight:400;margin:6px 0 0}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#f0f0f0;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;border:1px solid #ccc}td{padding:8px 10px;border:1px solid #ddd;font-size:13px;vertical-align:top}.footer{margin-top:20px;font-size:10px;color:#999;text-align:center}</style></head><body>';
+  h += '<div class="head">'+(b.logo?'<img src="'+b.logo+'" alt="">':'')+'<div><h1>'+b.name+' – '+title+'</h1><h2>'+(subtitle||'')+'</h2><h3>Generated: '+date+'</h3></div></div>';
   h += '<table><thead><tr>'+headers.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>';
   rows.forEach(r=>{h+='<tr>'+r.map(c=>'<td>'+(c!=null?c:'')+'</td>').join('')+'</tr>';});
-  h += '</tbody></table><div class="footer">The World School, ICSE – Bhusawal | Kolte Foundation Educational Institution</div></body></html>';
+  h += '</tbody></table><div class="footer">'+b.name+(b.tagline?' – '+b.tagline:'')+'</div></body></html>';
   return h;
 }
 
@@ -469,6 +495,66 @@ function findFreeTeachers(dayIdx,start,end,tt,classes,school,teachers,excludeIds
   return teachers.filter(t=>!busy.has(t.id));
 }
 
+// ====== Backtracking auto-fill solver ======
+// Fills one class's timetable while respecting:
+//   - subject quota derived from allocations (balanced across the week)
+//   - teacher cross-class clash (no double-booking at the same time slot)
+//   - teacher max periods/week (global cap across all classes)
+//   - same-subject-per-day cap (default 2)
+// Returns the new days->periods map for the class, or null if infeasible.
+function backtrackingAutoFill(classId,data,opts){
+  const cls=data.classes.find(c=>c.id===classId);if(!cls)return null;
+  const pList=getPeriodsForClass(data.school,cls);const days=data.school.days;
+  const slots=[];days.forEach((_,di)=>pList.forEach((p,pi)=>{if(!isNonTeaching(p))slots.push([di,pi]);}));
+  const total=slots.length;if(!total)return{};
+  const allocs=Object.entries(data.allocations).filter(([k])=>k.startsWith(classId+'|'));
+  if(!allocs.length)return null;
+  const subjectIds=allocs.map(([k])=>k.split('|')[1]);
+  const base=Math.floor(total/subjectIds.length);
+  const quota={};subjectIds.forEach(s=>quota[s]=base);
+  let rem=total-base*subjectIds.length;for(const s of subjectIds){if(rem<=0)break;quota[s]++;rem--;}
+  // Teacher state from other classes (excluding current)
+  const teacherBusy={};const teacherLoad={};
+  data.classes.forEach(other=>{if(other.id===classId)return;
+    const oP=getPeriodsForClass(data.school,other);const oTT=data.timetable[other.id]||{};
+    Object.keys(oTT).forEach(d=>Object.keys(oTT[d]||{}).forEach(pi=>{
+      const c=oTT[d][pi];if(!c||!c.teacherId)return;const p=oP[Number(pi)];if(!p||isNonTeaching(p))return;
+      teacherBusy[d+'|'+p.start+'|'+p.end+'|'+c.teacherId]=true;
+      teacherLoad[c.teacherId]=(teacherLoad[c.teacherId]||0)+1;
+    }));
+  });
+  const tById=id=>data.teachers.find(t=>t.id===id);
+  const MAX_SAME_DAY=(opts&&opts.maxSameSubjectPerDay)||2;
+  const result={};days.forEach((_,di)=>{result[di]={};});
+  const sameDayCount={};days.forEach((_,di)=>{sameDayCount[di]={};});
+  function shuffled(arr){const a=arr.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+  function solve(idx){
+    if(idx===slots.length)return true;
+    const[di,pi]=slots[idx];const p=pList[pi];
+    // Order candidates: highest remaining quota first, then random tiebreak
+    const cands=shuffled(subjectIds.filter(s=>quota[s]>0)).sort((a,b)=>quota[b]-quota[a]);
+    for(const sId of cands){
+      if((sameDayCount[di][sId]||0)>=MAX_SAME_DAY)continue;
+      const tId=data.allocations[allocKey(classId,sId)];
+      if(tId){
+        if(teacherBusy[di+'|'+p.start+'|'+p.end+'|'+tId])continue;
+        const t=tById(tId);const max=(t&&t.maxPeriods)||35;
+        if((teacherLoad[tId]||0)>=max)continue;
+      }
+      // Place
+      result[di][pi]={subjectId:sId,teacherId:tId||null,roomId:null};
+      quota[sId]--;sameDayCount[di][sId]=(sameDayCount[di][sId]||0)+1;
+      if(tId){teacherBusy[di+'|'+p.start+'|'+p.end+'|'+tId]=true;teacherLoad[tId]=(teacherLoad[tId]||0)+1;}
+      if(solve(idx+1))return true;
+      // Undo
+      delete result[di][pi];quota[sId]++;sameDayCount[di][sId]--;
+      if(tId){delete teacherBusy[di+'|'+p.start+'|'+p.end+'|'+tId];teacherLoad[tId]--;}
+    }
+    return false;
+  }
+  const ok=solve(0);return ok?result:null;
+}
+
 // ====== Searchable Select ======
 function SearchSelect({value,options,onChange,placeholder,style:wrapStyle}){
   const[open,setOpen]=useState(false);const[search,setSearch]=useState('');const ref=useRef(null);
@@ -502,7 +588,11 @@ function App(){
   return(
     <div className="app">
       <aside className="sidebar">
-        <div className="brand"><div className="mark">The World School · ICSE</div><div className="name serif">Timetable <em>Studio</em></div></div>
+        <div className="brand">
+          {data.school.logo&&<div className="school-logo"><img src={data.school.logo} alt="School logo"/></div>}
+          <div className="mark">{data.school.name||'The World School · ICSE'}</div>
+          <div className="name serif">Timetable <em>Studio</em></div>
+        </div>
         <nav className="nav">{tabs.map(t=>(<button key={t.id} className={`nav-item ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)}><span className="num">{t.num}</span><span>{t.name}</span></button>))}</nav>
         <div className="footer-note" style={{padding:'12px 14px'}}>
           <button className="btn btn-primary btn-sm" style={{width:'100%',marginBottom:6,justifyContent:'center'}} onClick={()=>saveAsHTMLFile(data)}>Save as File</button>
@@ -559,9 +649,11 @@ function SchoolSetup({data,update}){
   const[session,setSession]=useState(data.school.activeSession||'normal');const[group,setGroup]=useState('primary');
   const periods=(group==='upper')?(data.school.upperPeriods||data.school.primaryPeriods):data.school.primaryPeriods;
   const[edited,setEdited]=useState(periods.map(p=>({...p})));const[days,setDays]=useState(data.school.days);
+  const[schoolName,setSchoolName]=useState(data.school.name||'The World School, ICSE');
+  const[tagline,setTagline]=useState(data.school.tagline||'');
   useEffect(()=>{const p=(group==='upper')?(data.school.upperPeriods||data.school.primaryPeriods):data.school.primaryPeriods;setEdited(p.map(x=>({...x})));},[group,data.school.primaryPeriods,data.school.upperPeriods]);
   const loadSession=k=>{setSession(k);update({school:{...data.school,activeSession:k,primaryPeriods:SESSION_PRESETS[k].primary.periods.map(p=>({...p})),upperPeriods:SESSION_PRESETS[k].upper.periods.map(p=>({...p}))}});};
-  const save=()=>{const patch=group==='upper'?{upperPeriods:edited}:{primaryPeriods:edited};update({school:{...data.school,...patch,days,activeSession:session}});};
+  const save=()=>{const patch=group==='upper'?{upperPeriods:edited}:{primaryPeriods:edited};update({school:{...data.school,...patch,days,activeSession:session,name:schoolName,tagline}});};
   const updP=(i,k,v)=>setEdited(p=>{const n=[...p];n[i]={...n[i],[k]:v};return n;});
   const addP=()=>setEdited(p=>[...p,{name:'New',start:'14:15',end:'14:55'}]);
   const remP=i=>setEdited(p=>p.filter((_,idx)=>idx!==i));
@@ -570,10 +662,41 @@ function SchoolSetup({data,update}){
   const tStyle=p=>p.isBreak?{background:'var(--danger-soft)',color:'var(--danger)'}:p.isAssembly?{background:'rgba(13,79,60,0.1)',color:'var(--accent)'}:p.isOrientation?{background:'rgba(184,101,31,0.1)',color:'var(--warm)'}:{};
   const dsExpH=['#','Label','Start','End','Type'];
   const dsExpR=edited.map((p,i)=>[String(i+1).padStart(2,'0'),p.name,p.start,p.end,p.isBreak?'Recess':p.isAssembly?'Assembly':p.isOrientation?'Orientation':'Teaching']);
+
+  // Period validation: invalid (start>=end) or overlapping rows
+  const issues=useMemo(()=>{
+    const invalid=new Set();const overlap=new Set();
+    edited.forEach((p,i)=>{if(!p.start||!p.end||p.start>=p.end)invalid.add(i);});
+    for(let i=0;i<edited.length;i++){const a=edited[i];if(invalid.has(i))continue;
+      for(let j=i+1;j<edited.length;j++){const b=edited[j];if(invalid.has(j))continue;
+        if(timeOverlaps(a.start,a.end,b.start,b.end)){overlap.add(i);overlap.add(j);}
+      }
+    }
+    return{invalid,overlap};
+  },[edited]);
+  const rowStyle=i=>issues.invalid.has(i)?{background:'var(--danger-soft)'}:issues.overlap.has(i)?{background:'#fef3c7'}:{};
+  const hasIssues=issues.invalid.size>0||issues.overlap.size>0;
+
+  const handleLogo=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=()=>{const max=256;const sc=Math.min(max/img.width,max/img.height,1);const w=Math.round(img.width*sc);const h=Math.round(img.height*sc);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);update({school:{...data.school,logo:c.toDataURL('image/png')}});};img.src=ev.target.result;};r.readAsDataURL(f);};inp.click();};
+  const removeLogo=()=>{if(!confirm('Remove the school logo?'))return;update({school:{...data.school,logo:''}});};
+
   return(<div>
     <div className="pagehead"><div><h1 className="serif">Day <em>Structure</em></h1><div className="sub">Pick session, then edit Primary or Upper grids independently.</div></div><div className="actions">
       <ExportBar title={'Day Structure – '+(group==='primary'?'Primary':'Upper')} headers={dsExpH} rows={dsExpR} subtitle={SESSION_PRESETS[session].label+' Session'}/>
       <button className="btn btn-primary" onClick={save}>Save Changes</button></div></div>
+    <div className="card"><div className="card-title">School Identity</div>
+      <div style={{display:'flex',gap:24,alignItems:'flex-start',flexWrap:'wrap'}}>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:8}}>
+          <div className="logo-uploader" onClick={handleLogo}>{data.school.logo?<img src={data.school.logo} alt="School logo"/>:<div className="placeholder">Click to upload<br/>school logo</div>}</div>
+          {data.school.logo&&<button className="btn btn-danger btn-sm" onClick={removeLogo}>Remove logo</button>}
+        </div>
+        <div style={{flex:'1 1 280px',minWidth:240}}>
+          <div className="field"><label>School Name</label><input value={schoolName} onChange={e=>setSchoolName(e.target.value)} placeholder="The World School, ICSE"/></div>
+          <div className="field"><label>Tagline / Address</label><input value={tagline} onChange={e=>setTagline(e.target.value)} placeholder="Bhusawal | Kolte Foundation Educational Institution"/></div>
+          <div style={{fontSize:11.5,color:'var(--ink-muted)',marginTop:4}}>Click <strong>Save Changes</strong> at the top to apply name & tagline. Logo saves immediately on upload.</div>
+        </div>
+      </div>
+    </div>
     <div className="card"><div className="card-title">Session Presets</div><div className="grid-3">{Object.entries(SESSION_PRESETS).map(([k,pr])=>(<button key={k} onClick={()=>loadSession(k)} style={{textAlign:'left',padding:'16px 18px',border:session===k?'2px solid var(--accent)':'1px solid var(--line)',borderRadius:8,background:session===k?'var(--accent)':'var(--paper)',color:session===k?'var(--paper)':'var(--ink)',cursor:'pointer'}}><div style={{fontWeight:600,fontSize:14}}>{pr.label}</div><div style={{fontSize:12,opacity:.7}}>{pr.months}</div></button>))}</div></div>
     <div className="card"><div className="card-title">Working Days</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d=>(<button key={d} onClick={()=>setDays(ds=>ds.includes(d)?ds.filter(x=>x!==d):[...ds,d])} className={days.includes(d)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{d}</button>))}</div></div>
     <div className="card">
@@ -582,8 +705,14 @@ function SchoolSetup({data,update}){
           <div className="tab-bar"><button className={`tab-btn ${group==='primary'?'active':''}`} onClick={()=>setGroup('primary')}>Primary (1–4)</button><button className={`tab-btn ${group==='upper'?'active':''}`} onClick={()=>setGroup('upper')}>Upper (5–10)</button></div>
         </div><button className="btn btn-ghost btn-sm" onClick={addP}>+ Add</button></div>
       <div style={{fontSize:12,color:'var(--ink-muted)',marginBottom:10}}>{getTeachingCount(edited)} teaching | Click type to cycle</div>
+      {hasIssues&&(<div style={{padding:'10px 14px',marginBottom:12,borderRadius:6,background:'var(--danger-soft)',color:'var(--danger)',fontSize:12.5,border:'1px solid var(--danger)'}}>
+        <strong>Validation:</strong>
+        {issues.invalid.size>0&&<span> {issues.invalid.size} row(s) have an invalid time range (start ≥ end).</span>}
+        {issues.overlap.size>0&&<span> {issues.overlap.size} row(s) overlap another period.</span>}
+        <span style={{color:'var(--ink-muted)'}}> · Fix before saving to avoid scheduling conflicts.</span>
+      </div>)}
       <table><thead><tr><th>#</th><th>Label</th><th>Start</th><th>End</th><th>Type</th><th></th></tr></thead><tbody>
-        {edited.map((p,i)=>(<tr key={i}><td className="mono" style={{color:'var(--ink-muted)'}}>{String(i+1).padStart(2,'0')}</td><td><input value={p.name} onChange={e=>updP(i,'name',e.target.value)} style={{width:140,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><input type="time" value={p.start} onChange={e=>updP(i,'start',e.target.value)} style={{padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><input type="time" value={p.end} onChange={e=>updP(i,'end',e.target.value)} style={{padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><button className="btn btn-ghost btn-sm" style={tStyle(p)} onClick={()=>cycleType(i)}>{tLabel(p)}</button></td><td style={{textAlign:'right'}}><button className="btn btn-icon btn-danger" onClick={()=>remP(i)}>x</button></td></tr>))}
+        {edited.map((p,i)=>(<tr key={i} style={rowStyle(i)}><td className="mono" style={{color:'var(--ink-muted)'}}>{String(i+1).padStart(2,'0')}</td><td><input value={p.name} onChange={e=>updP(i,'name',e.target.value)} style={{width:140,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><input type="time" value={p.start} onChange={e=>updP(i,'start',e.target.value)} style={{padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><input type="time" value={p.end} onChange={e=>updP(i,'end',e.target.value)} style={{padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><button className="btn btn-ghost btn-sm" style={tStyle(p)} onClick={()=>cycleType(i)}>{tLabel(p)}</button></td><td style={{textAlign:'right'}}><button className="btn btn-icon btn-danger" onClick={()=>remP(i)}>x</button></td></tr>))}
       </tbody></table>
     </div>
   </div>);
@@ -869,7 +998,17 @@ function TimetablePage({data,update}){
   const cls=data.classes.find(c=>c.id===classId);const pList=cls?getPeriodsForClass(data.school,cls):data.school.primaryPeriods;const tCount=getTeachingCount(pList);
   const setCell=(sId,roomId)=>{if(!picker)return;const tId=sId?data.allocations[allocKey(classId,sId)]:null;const tt=JSON.parse(JSON.stringify(data.timetable));if(!tt[classId])tt[classId]={};if(!tt[classId][picker.d])tt[classId][picker.d]={};if(sId)tt[classId][picker.d][picker.p]={subjectId:sId,teacherId:tId||null,roomId:roomId||null};else delete tt[classId][picker.d][picker.p];update({timetable:tt});setPicker(null);};
   const clearClass=()=>{if(!confirm('Clear?'))return;const tt={...data.timetable};delete tt[classId];update({timetable:tt});};
-  const autoFill=()=>{const al=Object.entries(data.allocations).filter(([k])=>k.startsWith(classId+'|'));if(!al.length){alert('No allocations.');return;}const ws=tCount*data.school.days.length;const cnt={};const ps=Math.floor(ws/al.length);al.forEach(([k])=>cnt[k.split('|')[1]]=ps);let rem=ws-ps*al.length;al.forEach(([k])=>{if(rem>0){cnt[k.split('|')[1]]++;rem--;}});const tt=JSON.parse(JSON.stringify(data.timetable));if(!tt[classId])tt[classId]={};const pos=[];data.school.days.forEach((_,d)=>pList.forEach((p,pi)=>{if(!isNonTeaching(p))pos.push([d,pi]);}));const pool=[];Object.entries(cnt).forEach(([s,n])=>{for(let i=0;i<n;i++)pool.push(s);});for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}pos.forEach(([d,pi],i)=>{const s=pool[i];if(!s)return;if(!tt[classId][d])tt[classId][d]={};tt[classId][d][pi]={subjectId:s,teacherId:data.allocations[allocKey(classId,s)]||null,roomId:null};});update({timetable:tt});};
+  const autoFill=()=>{
+    const al=Object.entries(data.allocations).filter(([k])=>k.startsWith(classId+'|'));
+    if(!al.length){alert('No allocations for this class. Add them in the Allocations tab first.');return;}
+    if(!confirm('Auto-fill will overwrite the existing timetable for this class. Continue?'))return;
+    const result=backtrackingAutoFill(classId,data);
+    if(!result){
+      alert('Could not satisfy all constraints.\n\nThe solver tried to avoid teacher clashes, respect max periods/week, and cap each subject at 2 per day.\n\nTry: adding more allocations, raising teacher max-periods, or freeing up shared teachers.');
+      return;
+    }
+    const tt=JSON.parse(JSON.stringify(data.timetable));tt[classId]=result;update({timetable:tt});
+  };
   const clsOpts=data.classes.map(c=>({value:c.id,label:c.name+' ('+(c.group==='upper'?'Upper':'Primary')+')'}));
   const ttExpH=['Period',...data.school.days.map(d=>d.slice(0,3))];
   const ttExpR=pList.map((p,pi)=>[p.name+' ('+p.start+'–'+p.end+')',...data.school.days.map((_,di)=>{if(isNonTeaching(p))return p.name;const cell=data.timetable[classId]&&data.timetable[classId][di]&&data.timetable[classId][di][pi];if(!cell)return'';const subj=data.subjects.find(s=>s.id===cell.subjectId);const teacher=data.teachers.find(t=>t.id===cell.teacherId);const room=cell.roomId?(data.rooms||[]).find(r=>r.id===cell.roomId):null;return(subj?subj.code:'')+(teacher?' ('+teacher.code+')':'')+(room?' ['+room.name+']':'');})]);
@@ -964,35 +1103,91 @@ function ProxyPage({data,update}){
 
   const assignProxy=(slotKey,proxyId)=>setAssignments(a=>({...a,[slotKey]:proxyId}));
 
-  const printProxySlips=()=>{
-    // Gather proxy assignments per proxy teacher
+  const[pdfBusy,setPdfBusy]=useState(false);
+
+  const collectByProxy=()=>{
     const byProxy={};
     Object.entries(assignments).forEach(([key,proxyId])=>{if(!proxyId)return;
-      const[absentId,pStart,pEnd,classId]=key.split('|');
+      const parts=key.split('|');const[absentId,pStart,pEnd,clsId,subjId]=parts;
       const absent=data.teachers.find(t=>t.id===absentId);const proxy=data.teachers.find(t=>t.id===proxyId);
-      const cls=data.classes.find(c=>c.id===classId);const subj=data.subjects.find(s=>s.id===key.split('|')[4]);
+      const cls=data.classes.find(c=>c.id===clsId);const subj=data.subjects.find(s=>s.id===subjId);
       if(!proxy)return;if(!byProxy[proxyId])byProxy[proxyId]={teacher:proxy,slots:[]};
       byProxy[proxyId].slots.push({start:pStart,end:pEnd,className:cls?cls.name:'?',subjectName:subj?subj.name:'?',absentName:absent?absent.name:'?'});
     });
-    // Open print window
-    const dayName=data.school.days[dayIdx];const date=new Date().toLocaleDateString('en-IN');
-    let html='<html><head><title>Proxy Slips</title><style>body{font-family:Arial,sans-serif;padding:20px}h2{margin:0 0 4px}table{width:100%;border-collapse:collapse;margin:8px 0 24px}th,td{border:1px solid #999;padding:8px;text-align:left;font-size:13px}th{background:#f0f0f0}.slip{page-break-after:always;padding:20px;border:2px solid #333;margin-bottom:24px;border-radius:8px}@media print{.slip{page-break-after:always}}</style></head><body>';
-    html+='<div style="text-align:center;margin-bottom:20px"><h1>The World School, ICSE — Proxy Schedule</h1><p>'+dayName+' · '+date+'</p></div>';
+    return byProxy;
+  };
+
+  const buildSlipsHTML=()=>{
+    const byProxy=collectByProxy();const dayName=data.school.days[dayIdx];const date=new Date().toLocaleDateString('en-IN');
+    const logo=data.school.logo;const sName=data.school.name||'The World School, ICSE';const sTag=data.school.tagline||'';
+    let html='';
     Object.values(byProxy).forEach(({teacher:pr,slots})=>{
-      html+='<div class="slip"><h2>Proxy Slip for: '+pr.name+' ('+pr.code+')</h2><p style="color:#666;margin-bottom:8px">'+dayName+' · '+date+'</p><table><tr><th>Time</th><th>Class</th><th>Subject</th><th>Absent Teacher</th></tr>';
-      slots.sort((a,b)=>a.start.localeCompare(b.start)).forEach(s=>{html+='<tr><td>'+s.start+'–'+s.end+'</td><td>'+s.className+'</td><td>'+s.subjectName+'</td><td>'+s.absentName+'</td></tr>';});
-      html+='</table><div style="margin-top:24px;display:flex;justify-content:space-between"><div>Signature of Proxy Teacher: _______________</div><div>Coordinator: _______________</div></div></div>';
+      html+='<div class="slip" data-slip="1" style="padding:36px;width:794px;min-height:1100px;box-sizing:border-box;page-break-after:always;background:white;font-family:Arial,sans-serif;color:#1a1f1c">';
+      html+='<div style="display:flex;align-items:center;gap:16px;border-bottom:2px solid #0d4f3c;padding-bottom:14px;margin-bottom:18px">';
+      if(logo)html+='<img src="'+logo+'" style="width:64px;height:64px;object-fit:contain"/>';
+      html+='<div><h1 style="margin:0;font-size:22px;color:#0d4f3c">'+sName+'</h1>';
+      html+='<div style="color:#666;font-size:12px;margin-top:2px">'+(sTag||'Proxy Schedule')+'</div></div></div>';
+      html+='<h2 style="margin:0 0 4px;font-size:18px">Proxy Slip — '+pr.name+' <span style="color:#666;font-weight:400;font-size:14px">('+pr.code+')</span></h2>';
+      html+='<p style="color:#666;margin:0 0 18px;font-size:13px">'+dayName+' · '+date+'</p>';
+      html+='<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="background:#f0f0f0">';
+      html+='<th style="border:1px solid #999;padding:10px;text-align:left">Time</th><th style="border:1px solid #999;padding:10px;text-align:left">Class</th><th style="border:1px solid #999;padding:10px;text-align:left">Subject</th><th style="border:1px solid #999;padding:10px;text-align:left">Covering For</th></tr></thead><tbody>';
+      slots.sort((a,b)=>a.start.localeCompare(b.start)).forEach(s=>{
+        html+='<tr><td style="border:1px solid #999;padding:10px">'+s.start+'–'+s.end+'</td><td style="border:1px solid #999;padding:10px">'+s.className+'</td><td style="border:1px solid #999;padding:10px">'+s.subjectName+'</td><td style="border:1px solid #999;padding:10px">'+s.absentName+'</td></tr>';
+      });
+      html+='</tbody></table>';
+      html+='<div style="margin-top:60px;display:flex;justify-content:space-between;font-size:13px;color:#333"><div>Signature of Proxy Teacher: ___________________</div><div>Coordinator: ___________________</div></div>';
+      html+='<div style="position:absolute;bottom:20px;left:36px;right:36px;text-align:center;font-size:10px;color:#999">'+sName+(sTag?' · '+sTag:'')+'</div>';
+      html+='</div>';
     });
-    html+='</body></html>';
-    const w=window.open('','_blank');w.document.write(html);w.document.close();w.print();
+    return html;
+  };
+
+  const downloadProxyPDF=async()=>{
+    const byProxy=collectByProxy();
+    if(!Object.keys(byProxy).length){alert('No proxy assignments to export.');return;}
+    if(!window.jspdf||!window.html2canvas){alert('PDF libraries not loaded yet. Check your internet connection and try again.');return;}
+    setPdfBusy(true);
+    const container=document.createElement('div');
+    container.style.cssText='position:fixed;left:-99999px;top:0;background:white';
+    container.innerHTML=buildSlipsHTML();
+    document.body.appendChild(container);
+    try{
+      const{jsPDF}=window.jspdf;
+      const pdf=new jsPDF({unit:'pt',format:'a4'});
+      const slips=container.querySelectorAll('[data-slip]');
+      for(let i=0;i<slips.length;i++){
+        const canvas=await window.html2canvas(slips[i],{scale:2,backgroundColor:'#ffffff',logging:false});
+        const img=canvas.toDataURL('image/jpeg',0.92);
+        const pw=pdf.internal.pageSize.getWidth();const ph=pdf.internal.pageSize.getHeight();
+        const ratio=Math.min(pw/canvas.width,ph/canvas.height);
+        const w=canvas.width*ratio;const h=canvas.height*ratio;
+        if(i>0)pdf.addPage();
+        pdf.addImage(img,'JPEG',(pw-w)/2,(ph-h)/2,w,h);
+      }
+      const dayName=data.school.days[dayIdx];
+      pdf.save('Proxy_Slips_'+dayName+'_'+new Date().toISOString().slice(0,10)+'.pdf');
+    }catch(e){alert('PDF generation failed: '+(e&&e.message?e.message:e));}
+    finally{document.body.removeChild(container);setPdfBusy(false);}
+  };
+
+  const printProxySlips=()=>{
+    const byProxy=collectByProxy();
+    if(!Object.keys(byProxy).length){alert('No proxy assignments to print.');return;}
+    const ifr=document.createElement('iframe');ifr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';document.body.appendChild(ifr);
+    const doc=ifr.contentDocument||ifr.contentWindow.document;
+    doc.open();doc.write('<!DOCTYPE html><html><head><title>Proxy Slips</title></head><body>'+buildSlipsHTML()+'</body></html>');doc.close();
+    setTimeout(()=>{try{ifr.contentWindow.focus();ifr.contentWindow.print();}catch(e){}setTimeout(()=>document.body.removeChild(ifr),1000);},500);
   };
 
   const dayOpts=data.school.days.map((d,i)=>({value:String(i),label:d}));
   const teacherOpts=data.teachers.map(t=>({value:t.id,label:t.code+' – '+t.name}));
 
   return(<div>
-    <div className="pagehead"><div><h1 className="serif">Proxy <em>Management</em></h1><div className="sub">Mark absent teachers, view their schedule, assign free substitutes, and print proxy slips.</div></div>
-      {Object.keys(assignments).length>0&&<div className="actions"><button className="btn btn-primary" onClick={printProxySlips}>Print Proxy Slips</button></div>}
+    <div className="pagehead"><div><h1 className="serif">Proxy <em>Management</em></h1><div className="sub">Mark absent teachers, view their schedule, assign free substitutes, and download or print proxy slips.</div></div>
+      {Object.keys(assignments).filter(k=>assignments[k]).length>0&&<div className="actions">
+        <button className="btn btn-ghost" onClick={printProxySlips} disabled={pdfBusy}>Print</button>
+        <button className="btn btn-primary" onClick={downloadProxyPDF} disabled={pdfBusy}>{pdfBusy?'Generating PDF…':'Download PDF'}</button>
+      </div>}
     </div>
 
     <div className="card">
