@@ -1,0 +1,19 @@
+{
+  "name": "TWS Timetable Studio",
+  "short_name": "Timetable Studio",
+  "description": "School timetable builder for The World School ICSE.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f3ec",
+  "theme_color": "#0d4f3c",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
