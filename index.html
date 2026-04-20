@@ -707,7 +707,19 @@ function ClassesPage({data,update}){
   const saveEdit=()=>{if(!draft)return;update({classes:data.classes.map(c=>c.id===draft.id?draft:c)});setEditId(null);setDraft(null);};
   const deleteClass=id=>{if(!confirm('Delete this class and its timetable?'))return;setEditId(null);setDraft(null);update({classes:data.classes.filter(c=>c.id!==id),timetable:Object.fromEntries(Object.entries(data.timetable).filter(([k])=>k!==id))});};
   const tOpts=data.teachers.map(t=>({value:t.id,label:t.code+' – '+t.name}));
-  const sOpts=data.subjects.map(s=>({value:s.id,label:s.code+' – '+s.name}));
+  // Filter subject options to only what the chosen class teacher is qualified to teach.
+  // If no teacher is selected, or the teacher has no subjects listed, show all subjects.
+  const subjectOptsForTeacher=tId=>{
+    const t=tId?data.teachers.find(x=>x.id===tId):null;
+    const allowed=t&&t.subjects&&t.subjects.length?new Set(t.subjects):null;
+    return data.subjects.filter(s=>!allowed||allowed.has(s.id)).map(s=>({value:s.id,label:s.code+' – '+s.name}));
+  };
+  const addSubjOpts=subjectOptsForTeacher(teacher);
+  const draftSubjOpts=draft?subjectOptsForTeacher(draft.classTeacherId):[];
+  // Auto-clear the Add-form first subject if it's no longer taught by the chosen teacher.
+  useEffect(()=>{if(!teacher||!firstSubject)return;const t=data.teachers.find(x=>x.id===teacher);if(!t||!t.subjects||!t.subjects.length)return;if(!t.subjects.includes(firstSubject))setFirstSubject('');},[teacher,firstSubject,data.teachers]);
+  // When editing, changing the class teacher should clear an incompatible first subject.
+  const setDraftTeacher=v=>setDraft(d=>{if(!d)return d;const t=v?data.teachers.find(x=>x.id===v):null;const allowed=t&&t.subjects&&t.subjects.length?t.subjects:null;const keepFirst=!allowed||!d.firstSubjectId||allowed.includes(d.firstSubjectId);return{...d,classTeacherId:v||null,firstSubjectId:keepFirst?d.firstSubjectId:null};});
   const iStyle={padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontSize:12.5};
   const expH=['Section','Group','Strength','Class Teacher','Default First Subject'];
   const expR=data.classes.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);const fs=c.firstSubjectId?data.subjects.find(s=>s.id===c.firstSubjectId):null;return[c.name,c.group==='primary'?'Primary':'Upper',c.strength||'',ct?ct.name:'',fs?fs.name:''];});
@@ -720,7 +732,7 @@ function ClassesPage({data,update}){
       <div className="field"><label>Group</label><select value={grp} onChange={e=>setGrp(e.target.value)}><option value="preprimary">Pre-Primary</option><option value="primary">Primary</option><option value="upper">Upper</option></select></div>
       <div className="field"><label>Strength</label><input type="number" placeholder="35" value={strength} onChange={e=>setStrength(e.target.value)}/></div>
       <div className="field"><label>Class Teacher</label><SearchSelect value={teacher} options={[{value:'',label:'-- None --'},...tOpts]} onChange={setTeacher}/></div>
-      <div className="field"><label>First Subject / Day</label><SearchSelect value={firstSubject} options={[{value:'',label:'-- None --'},...sOpts]} onChange={setFirstSubject}/></div>
+      <div className="field"><label>First Subject / Day</label><SearchSelect value={firstSubject} options={[{value:'',label:teacher?'-- None --':'-- Pick a class teacher first --'},...addSubjOpts]} onChange={setFirstSubject}/></div>
       <button className="btn btn-primary" onClick={add}>Add</button>
     </div></div>
     <div className="card" style={{padding:0,overflow:'hidden'}}>{data.classes.length===0?<div className="empty-state"><h3 className="serif">No classes</h3></div>:
@@ -741,8 +753,8 @@ function ClassesPage({data,update}){
                 <div className="field" style={{margin:0}}><label>Section Name</label><input value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))} style={iStyle}/></div>
                 <div className="field" style={{margin:0}}><label>Group</label><select value={draft.group} onChange={e=>setDraft(d=>({...d,group:e.target.value}))} style={iStyle}><option value="preprimary">Pre-Primary</option><option value="primary">Primary</option><option value="upper">Upper</option></select></div>
                 <div className="field" style={{margin:0}}><label>Strength</label><input type="number" value={draft.strength||''} onChange={e=>setDraft(d=>({...d,strength:Number(e.target.value)||0}))} style={iStyle}/></div>
-                <div className="field" style={{margin:0}}><label>Class Teacher</label><SearchSelect value={draft.classTeacherId||''} options={[{value:'',label:'-- None --'},...tOpts]} onChange={v=>setDraft(d=>({...d,classTeacherId:v||null}))}/></div>
-                <div className="field" style={{margin:0}}><label>First Subject / Day</label><SearchSelect value={draft.firstSubjectId||''} options={[{value:'',label:'-- None --'},...sOpts]} onChange={v=>setDraft(d=>({...d,firstSubjectId:v||null}))}/></div>
+                <div className="field" style={{margin:0}}><label>Class Teacher</label><SearchSelect value={draft.classTeacherId||''} options={[{value:'',label:'-- None --'},...tOpts]} onChange={setDraftTeacher}/></div>
+                <div className="field" style={{margin:0}}><label>First Subject / Day</label><SearchSelect value={draft.firstSubjectId||''} options={[{value:'',label:draft.classTeacherId?'-- None --':'-- Pick a class teacher first --'},...draftSubjOpts]} onChange={v=>setDraft(d=>({...d,firstSubjectId:v||null}))}/></div>
               </div>
               <div style={{display:'flex',gap:8,justifyContent:'flex-end',borderTop:'1px solid var(--line)',paddingTop:12}}>
                 <button className="btn btn-danger" onClick={()=>deleteClass(draft.id)}>Delete</button>
