@@ -1478,7 +1478,50 @@ function AllocatePage({data,update}){
     <div className="pagehead"><div><h1 className="serif">Subject <em>Allocations</em></h1><div className="sub">Pick a teacher to scope subjects + classes, or pick a subject first and the teacher list narrows to teachers qualified for that subject (and assigned to the picked classes).</div></div>
       <ExportBar title="Subject Allocations" headers={expH} rows={expR}/>
     </div>
-    <div className="card"><div className="card-title">Bulk Assign</div>
+    {/* Standard-wise & subject-wise totals (allocations + actual scheduled periods) */}
+    {(()=>{
+      // Count allocations per class / per subject
+      const allocByClass={},allocBySubj={};
+      Object.keys(data.allocations||{}).forEach(k=>{const[cId,sId]=k.split('|');allocByClass[cId]=(allocByClass[cId]||0)+1;allocBySubj[sId]=(allocBySubj[sId]||0)+1;});
+      // Count scheduled periods per class / per subject (teaching slots only)
+      const schedByClass={},schedBySubj={};
+      data.classes.forEach(c=>{const tt=(data.timetable||{})[c.id]||{};
+        Object.keys(tt).forEach(d=>{const dayName=(data.school.days||[])[Number(d)];const pL=getPeriodsForClassDay(data.school,c,dayName);
+          Object.keys(tt[d]||{}).forEach(pi=>{const cell=tt[d][pi];if(!cell||!cell.subjectId)return;const p=pL[Number(pi)];if(!p||isNonTeaching(p))return;schedByClass[c.id]=(schedByClass[c.id]||0)+1;schedBySubj[cell.subjectId]=(schedBySubj[cell.subjectId]||0)+1;});
+        });
+      });
+      const classRows=sortedAllClasses.map(c=>({c,alloc:allocByClass[c.id]||0,sched:schedByClass[c.id]||0}));
+      const subjRows=data.subjects.map(s=>({s,alloc:allocBySubj[s.id]||0,sched:schedBySubj[s.id]||0})).sort((a,b)=>b.sched-a.sched||b.alloc-a.alloc);
+      const totalAlloc=Object.keys(data.allocations||{}).length;
+      const totalSched=Object.values(schedBySubj).reduce((s,n)=>s+n,0);
+      return(
+        <div className="grid-2" style={{gap:14,marginBottom:14}}>
+          <div style={{padding:'12px 14px',border:'1px solid var(--line)',borderRadius:8,background:'var(--paper)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:8,flexWrap:'wrap',gap:6}}>
+              <span style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--accent)'}}>Standard-wise</span>
+              <span style={{fontSize:11,color:'var(--ink-muted)'}}>{totalAlloc} allocations · {totalSched} scheduled periods / week</span>
+            </div>
+            {classRows.length?<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{classRows.map(({c,alloc,sched})=>(<span key={c.id} className="chip" style={{background:sched?'var(--accent)':alloc?'var(--line-soft)':'transparent',color:sched?'var(--paper)':'var(--ink-soft)',border:alloc?'none':'1px dashed var(--line)'}} title={alloc+' subjects allocated · '+sched+' periods scheduled'}>{c.name}: {alloc?alloc+'s':'0s'} / {sched}p</span>))}</div>:<span style={{fontSize:12,color:'var(--ink-muted)',fontStyle:'italic'}}>No classes.</span>}
+            <div style={{fontSize:10,color:'var(--ink-muted)',marginTop:6}}>each chip: <strong>subjects allocated</strong>s · <strong>periods scheduled</strong>p</div>
+          </div>
+          <div style={{padding:'12px 14px',border:'1px solid var(--line)',borderRadius:8,background:'var(--paper)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:8,flexWrap:'wrap',gap:6}}>
+              <span style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--warm)'}}>Subject-wise</span>
+              <span style={{fontSize:11,color:'var(--ink-muted)'}}>{Object.keys(allocBySubj).length} subjects active</span>
+            </div>
+            {subjRows.some(r=>r.alloc||r.sched)?<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{subjRows.filter(r=>r.alloc||r.sched).map(({s,alloc,sched})=>(<span key={s.id} className="chip" style={{background:s.color+'18',color:s.color}} title={alloc+' classes allocated · '+sched+' periods scheduled this week'}><span className="chip-color" style={{background:s.color}}></span>{s.code}: {alloc}c / {sched}p</span>))}</div>:<span style={{fontSize:12,color:'var(--ink-muted)',fontStyle:'italic'}}>Nothing allocated yet.</span>}
+            <div style={{fontSize:10,color:'var(--ink-muted)',marginTop:6}}>each chip: <strong>classes allocated</strong>c · <strong>periods scheduled</strong>p</div>
+          </div>
+        </div>
+      );
+    })()}
+    <div className="card"><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:14}}>
+        <div className="card-title" style={{margin:0}}>Bulk Assign</div>
+        <div style={{display:'flex',gap:6}}>
+          <button className="btn btn-danger btn-sm" onClick={()=>{if(!Object.keys(data.allocations||{}).length){alert('No allocations to clear.');return;}if(confirm('Clear ALL teacher-subject allocations?\n\nThe current timetable cells (already-scheduled periods) stay in place — only the class×subject→teacher links are wiped so you can redo them manually.\n\nContinue?'))update({allocations:{}});}}>Clear All Allocations</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>{if(!Object.keys(data.timetable||{}).length){alert('No scheduled periods.');return;}if(confirm('Clear ALL scheduled periods for every class?\n\nThis wipes the Timetable grids but keeps your allocations. You can then build the timetable manually.\n\nContinue?'))update({timetable:{}});}}>Clear All Timetables</button>
+        </div>
+      </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
         <div className="field" style={{margin:0}}><label>Subject</label><SearchSelect value={bulkSubj} options={[{value:'',label:bulkTeacher&&!subjOpts.length?'-- Teacher has no qualified subjects --':'-- Select Subject --'},...subjOpts]} onChange={setBulkSubj}/></div>
         <div className="field" style={{margin:0}}><label>Teacher{(bulkSubj||bulkClasses.length)?' (filtered)':''}</label><SearchSelect value={bulkTeacher} options={[{value:'',label:bulkSubj&&!teacherOpts.length?'-- No teacher matches subject & classes --':'-- Select Teacher --'},...teacherOpts]} onChange={setBulkTeacher}/></div>
