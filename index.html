@@ -581,7 +581,26 @@ function ExportBar({title, headers, rows, subtitle}){
 
 // ====== Helpers ======
 const allocKey=(c,s)=>`${c}|${s}`;
-function isNonTeaching(p){return p.isBreak||p.isAssembly||p.isOrientation}
+// Non-teaching detection. Respects the explicit flags first; otherwise falls
+// back to the period name so a row called "Recess 2" or "Lunch" acts as a
+// break even if the Type flag was never toggled — a common user oversight.
+const NONTEACHING_NAME_RE=/^(recess|break|lunch|interval|tiffin|short break|long break|assembly|morning\s+assembly|prayer|orientation|ho?m?e?\s*room|home\s*room)(\b|\d|$)/i;
+function isNonTeaching(p){
+  if(!p)return false;
+  if(p.isBreak||p.isAssembly||p.isOrientation)return true;
+  return NONTEACHING_NAME_RE.test((p.name||'').trim());
+}
+function inferredType(p){
+  if(!p)return'teaching';
+  if(p.isBreak)return'break';
+  if(p.isAssembly)return'assembly';
+  if(p.isOrientation)return'orientation';
+  const n=(p.name||'').trim();
+  if(/^(recess|break|lunch|interval|tiffin)/i.test(n))return'break';
+  if(/^(assembly|morning\s+assembly|prayer)/i.test(n))return'assembly';
+  if(/^(orientation|home\s*room|homeroom)/i.test(n))return'orientation';
+  return'teaching';
+}
 function getTeachingCount(p){return p.filter(x=>!isNonTeaching(x)).length}
 function getPeriodsForClass(school,cls){
   if(cls&&cls.group==='preprimary') return school.preprimaryPeriods||school.primaryPeriods;
@@ -808,7 +827,8 @@ function SchoolSetup({data,update}){
   const addP=()=>setEdited(p=>calcTimes(startTime,[...p,{name:'New',duration:35}]));
   const remP=i=>setEdited(p=>calcTimes(startTime,p.filter((_,idx)=>idx!==i)));
   const moveP=(i,dir)=>setEdited(p=>{const j=i+dir;if(j<0||j>=p.length)return p;const n=[...p];[n[i],n[j]]=[n[j],n[i]];return calcTimes(startTime,n);});
-  const cycleType=i=>setEdited(p=>{const n=[...p];const c=n[i];if(!c.isBreak&&!c.isAssembly&&!c.isOrientation)n[i]={...c,isBreak:true,isAssembly:false,isOrientation:false};else if(c.isBreak)n[i]={...c,isBreak:false,isAssembly:true,isOrientation:false};else if(c.isAssembly)n[i]={...c,isBreak:false,isAssembly:false,isOrientation:true};else n[i]={...c,isBreak:false,isAssembly:false,isOrientation:false};return n;});
+  const setTypeFlags=(c,kind)=>({...c,isBreak:kind==='break',isAssembly:kind==='assembly',isOrientation:kind==='orientation'});
+  const setType=(i,kind)=>setEdited(p=>{const n=[...p];n[i]=setTypeFlags(n[i],kind);return n;});
   const tLabel=p=>p.isBreak?'Recess':p.isAssembly?'Assembly':p.isOrientation?'Orientation':'Teaching';
   const tStyle=p=>p.isBreak?{background:'var(--danger-soft)',color:'var(--danger)'}:p.isAssembly?{background:'rgba(13,79,60,0.1)',color:'var(--accent)'}:p.isOrientation?{background:'rgba(184,101,31,0.1)',color:'var(--warm)'}:{};
   const totalTeaching=edited.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
@@ -882,7 +902,15 @@ function SchoolSetup({data,update}){
         <span style={{fontSize:12,color:'var(--ink-muted)'}}>{getTeachingCount(edited)} teaching periods | Teaching: {totalTeaching} min | Total day: {totalDay} min ({Math.floor(totalDay/60)}h {totalDay%60}m)</span>
       </div>
       <table><thead><tr><th>#</th><th>Label</th><th>Duration</th><th>Start</th><th>End</th><th>Type</th><th style={{textAlign:'center'}}>Order</th><th></th></tr></thead><tbody>
-        {edited.map((p,i)=>(<tr key={i}><td className="mono" style={{color:'var(--ink-muted)'}}>{String(i+1).padStart(2,'0')}</td><td><input value={p.name} onChange={e=>updP(i,'name',e.target.value)} style={{width:140,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><input type="number" value={p.duration||30} onChange={e=>updP(i,'duration',Number(e.target.value)||1)} style={{width:70,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,textAlign:'center'}} min={1}/></td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.start||''}</td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.end||''}</td><td><button className="btn btn-ghost btn-sm" style={tStyle(p)} onClick={()=>cycleType(i)}>{tLabel(p)}</button></td><td style={{whiteSpace:'nowrap',textAlign:'center'}}><button className="btn btn-icon" disabled={i===0} onClick={()=>moveP(i,-1)} title="Move up" style={{opacity:i===0?0.3:1}}>▲</button><button className="btn btn-icon" disabled={i===edited.length-1} onClick={()=>moveP(i,1)} title="Move down" style={{opacity:i===edited.length-1?0.3:1}}>▼</button></td><td style={{textAlign:'right'}}><button className="btn btn-icon btn-danger" onClick={()=>remP(i)}>x</button></td></tr>))}
+        {edited.map((p,i)=>{const effective=inferredType(p);const explicit=p.isBreak?'break':p.isAssembly?'assembly':p.isOrientation?'orientation':'teaching';const inferredFromName=effective!=='teaching'&&explicit==='teaching';return(<tr key={i}><td className="mono" style={{color:'var(--ink-muted)'}}>{String(i+1).padStart(2,'0')}</td><td><input value={p.name} onChange={e=>updP(i,'name',e.target.value)} style={{width:140,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><input type="number" value={p.duration||30} onChange={e=>updP(i,'duration',Number(e.target.value)||1)} style={{width:70,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,textAlign:'center'}} min={1} disabled={isNonTeaching(p)&&effective==='teaching'}/></td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.start||''}</td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.end||''}</td><td>
+          <select value={explicit} onChange={e=>setType(i,e.target.value)} style={{padding:'6px 8px',border:'1px solid var(--line)',borderRadius:5,fontSize:12,fontWeight:500,...tStyle(setTypeFlags(p,explicit))}}>
+            <option value="teaching">Teaching</option>
+            <option value="break">Recess / Break</option>
+            <option value="assembly">Assembly</option>
+            <option value="orientation">Orientation</option>
+          </select>
+          {inferredFromName&&<div style={{fontSize:10,color:'var(--warm)',marginTop:2}}>name suggests {effective} — click to apply</div>}
+        </td><td style={{whiteSpace:'nowrap',textAlign:'center'}}><button className="btn btn-icon" disabled={i===0} onClick={()=>moveP(i,-1)} title="Move up" style={{opacity:i===0?0.3:1}}>▲</button><button className="btn btn-icon" disabled={i===edited.length-1} onClick={()=>moveP(i,1)} title="Move down" style={{opacity:i===edited.length-1?0.3:1}}>▼</button></td><td style={{textAlign:'right'}}><button className="btn btn-icon btn-danger" onClick={()=>remP(i)}>x</button></td></tr>);})}
       </tbody></table>
     </div>
     {savedAt>0&&(
@@ -1554,9 +1582,10 @@ function TimetablePage({data,update}){
           <div className="tt-row"><div className="tt-cell header">Period</div>{dayIdxs.map(di=><div key={di} className="tt-cell header">{TB_DAYS[di]}</div>)}</div>
           {periods.map((p,pi)=>(<div className="tt-row" key={pi}><div className="tt-cell time"><div style={{fontWeight:600,color:'var(--ink-soft)',fontSize:11}}>{p.name}</div><div>{p.start}–{p.end}</div></div>
             {dayIdxs.map(di=>{
-              if(p.isBreak)return<div key={di} className="tt-cell break">{p.name}</div>;
-              if(p.isAssembly)return<div key={di} className="tt-cell assembly">{p.name}</div>;
-              if(p.isOrientation)return<div key={di} className="tt-cell orientation">{p.name}</div>;
+              const effective=inferredType(p);
+              if(effective==='break')return<div key={di} className="tt-cell break">{p.name}</div>;
+              if(effective==='assembly')return<div key={di} className="tt-cell assembly">{p.name}</div>;
+              if(effective==='orientation')return<div key={di} className="tt-cell orientation">{p.name}</div>;
               const cell=data.timetable[classId]&&data.timetable[classId][di]&&data.timetable[classId][di][pi];
               const subj=cell?data.subjects.find(s=>s.id===cell.subjectId):null;const teacher=cell?data.teachers.find(t=>t.id===cell.teacherId):null;
               const conType=conflicts[`${classId}|${di}|${pi}`];
@@ -1650,86 +1679,140 @@ function LoadPage({data}){
         {view==='session'&&<SearchSelect value={sessionPreview} options={Object.entries(SESSION_PRESETS).map(([k,pr])=>({value:k,label:pr.label}))} onChange={setSessionPreview} style={{minWidth:140}}/>}
       </div>
       {selT?(()=>{
-        // Weekly totals helpers
         const schedByDay=(data.school.days||[]).map((_,di)=>getTeacherScheduleForDay(selT.id,di,data.timetable,data.classes,data.school));
         const weekCount=schedByDay.reduce((s,a)=>s+a.length,0);
         const weekMins=schedByDay.reduce((s,a)=>s+a.reduce((ss,sl)=>ss+(timeDiff(sl.start,sl.end)),0),0);
+        // Always-on summary: subject-wise + standard-wise counts (per week).
+        const bySubjectWk={};schedByDay.forEach(arr=>arr.forEach(sl=>{bySubjectWk[sl.subjectId]=(bySubjectWk[sl.subjectId]||0)+1;}));
+        const byClassWk={};schedByDay.forEach(arr=>arr.forEach(sl=>{byClassWk[sl.classId]=(byClassWk[sl.classId]||0)+1;}));
+        const subjectSummary=Object.entries(bySubjectWk).map(([sId,n])=>{const s=data.subjects.find(x=>x.id===sId);return{sId,n,s};}).filter(x=>x.s).sort((a,b)=>b.n-a.n);
+        const classSummary=sortClasses(Object.entries(byClassWk).map(([cId,n])=>({cId,n,...(data.classes.find(x=>x.id===cId)||{})})));
+        // Build export payload based on the current view
+        const tsub=selT.name+' ('+selT.code+')';
+        const daysArr=data.school.days||[];
+        let expTitle='Personal Timetable', expSub=tsub, expH=[], expR=[];
         if(view==='day'){
-          const day=(data.school.days||[])[dayIdx]||'Day';
+          const day=daysArr[dayIdx]||'Day';
           const sched=schedByDay[dayIdx]||[];
-          return<div>
-            <div style={{fontSize:13,color:'var(--ink-soft)',marginBottom:10}}><strong>{day}</strong> — {sched.length} period(s), {sched.reduce((s,sl)=>s+timeDiff(sl.start,sl.end),0)} min</div>
-            {sched.length===0?<div style={{color:'var(--ink-muted)',fontStyle:'italic'}}>Free day.</div>:
-            <table><thead><tr><th>Time</th><th>Period</th><th>Class</th><th>Subject</th></tr></thead><tbody>
-              {sched.map((sl,i)=>{const subj=data.subjects.find(s=>s.id===sl.subjectId);return(<tr key={i}><td className="mono" style={{fontSize:12}}>{sl.start}–{sl.end}</td><td style={{fontSize:12}}>{sl.name}</td><td style={{fontSize:12,fontWeight:600}}>{sl.className}</td><td>{subj?<span className="chip" style={{background:subj.color+'22',color:subj.color}}><span className="chip-color" style={{background:subj.color}}></span>{subj.code} · {subj.name}</span>:'—'}</td></tr>);})}
-            </tbody></table>}
-          </div>;
-        }
-        if(view==='week'){
+          expTitle='Personal Timetable – '+day;
+          expH=['Time','Period','Class','Subject'];
+          expR=sched.map(sl=>{const subj=data.subjects.find(s=>s.id===sl.subjectId);return[sl.start+'–'+sl.end,sl.name,sl.className,subj?subj.code+' – '+subj.name:'—'];});
+        } else if(view==='week'){
           const allPeriodSets=data.classes.map(c=>getPeriodsForClass(data.school,c));
           const maxPeriods=Math.max(...allPeriodSets.map(p=>p.length),1);
-          return<div style={{overflowX:'auto'}}>
-            <div style={{fontSize:13,color:'var(--ink-soft)',marginBottom:10}}>Week total: <strong>{weekCount}</strong> periods · <strong>{weekMins}</strong> min ({Math.floor(weekMins/60)}h {weekMins%60}m)</div>
-            <table><thead><tr><th>Period</th>{(data.school.days||[]).map(d=><th key={d}>{d.slice(0,3)}</th>)}</tr></thead><tbody>
-              {Array.from({length:maxPeriods}).map((_,pi)=>(<tr key={pi}><td className="mono" style={{fontSize:12,color:'var(--ink-muted)'}}>{pi+1}</td>
-                {(data.school.days||[]).map((d,di)=>{const slot=(schedByDay[di]||[]).find(s=>s.periodIdx===pi);if(!slot)return<td key={di} style={{color:'var(--ink-muted)',fontSize:12}}>–</td>;const subj=data.subjects.find(s=>s.id===slot.subjectId);return<td key={di} style={{fontSize:12,background:subj?subj.color+'10':''}}><strong>{subj?subj.code:'?'}</strong><br/><span style={{fontSize:10,color:'var(--ink-muted)'}}>{slot.className}</span></td>;})}
-              </tr>))}
-            </tbody></table>
-          </div>;
-        }
-        if(view==='month'){
-          const weeksInMonth=4;const monthCount=weekCount*weeksInMonth;const monthMins=weekMins*weeksInMonth;
-          const bySubject={};schedByDay.forEach(arr=>arr.forEach(sl=>{bySubject[sl.subjectId]=(bySubject[sl.subjectId]||0)+1;}));
-          return<div>
-            <div className="grid-3" style={{marginBottom:12}}>
-              <div className="stat"><div className="label">Periods / week</div><div className="val">{weekCount}</div></div>
-              <div className="stat"><div className="label">Periods / month</div><div className="val">{monthCount}</div><div className="delta">~ {weeksInMonth} weeks</div></div>
-              <div className="stat"><div className="label">Hours / month</div><div className="val">{Math.floor(monthMins/60)}h {monthMins%60}m</div></div>
-            </div>
-            <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>By Subject (per month)</div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{Object.entries(bySubject).map(([sId,n])=>{const s=data.subjects.find(x=>x.id===sId);if(!s)return null;return<span key={sId} className="chip" style={{background:s.color+'18',color:s.color}}><span className="chip-color" style={{background:s.color}}></span>{s.code}: {n*weeksInMonth}</span>;})}</div>
-            <div style={{fontSize:11,color:'var(--ink-muted)',marginTop:10,fontStyle:'italic'}}>Estimated from 4 teaching weeks per month. Actual monthly count varies with holidays.</div>
-          </div>;
-        }
-        if(view==='session'){
+          expTitle='Personal Timetable – Week';
+          expH=['Period',...daysArr.map(d=>d.slice(0,3))];
+          expR=Array.from({length:maxPeriods}).map((_,pi)=>['P'+(pi+1),...daysArr.map((_,di)=>{const slot=(schedByDay[di]||[]).find(s=>s.periodIdx===pi);if(!slot)return'';const subj=data.subjects.find(s=>s.id===slot.subjectId);return(subj?subj.code:'?')+' · '+slot.className;})]);
+        } else if(view==='month'){
+          const weeksInMonth=4;
+          expTitle='Personal Timetable – Month';
+          expSub=tsub+' · '+weekCount+' periods/week · ~'+weeksInMonth+' teaching weeks';
+          expH=['Subject','Code','Per Week','Per Month (x'+weeksInMonth+')'];
+          expR=subjectSummary.map(x=>[x.s.name,x.s.code,x.n,x.n*weeksInMonth]);
+        } else if(view==='session'){
           const pr=SESSION_PRESETS[sessionPreview];
-          if(!pr)return<div className="empty-state">Unknown session.</div>;
-          const priP=buildSessionPeriods(pr.primary);const upP=buildSessionPeriods(pr.upper);const prP=buildSessionPeriods(pr.preprimary);
-          const teachPri=priP.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
-          const teachUp=upP.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
-          const teachPre=prP.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
-          return<div>
-            <div style={{fontSize:13,color:'var(--ink-soft)',marginBottom:12}}>Previewing how the periods are structured in <strong>{pr.label}</strong> ({pr.months}) — current assignments in the grid are kept. Period timings below reflect the session template.</div>
-            <div className="grid-3" style={{marginBottom:14}}>
-              <div className="stat"><div className="label">Primary teaching/day</div><div className="val">{teachPri}<span style={{fontSize:14}}> min</span></div></div>
-              <div className="stat"><div className="label">Upper teaching/day</div><div className="val">{teachUp}<span style={{fontSize:14}}> min</span></div></div>
-              <div className="stat"><div className="label">Pre-Pri teaching/day</div><div className="val">{teachPre}<span style={{fontSize:14}}> min</span></div></div>
-            </div>
-            <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Weekly assignments for this teacher</div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
-              {(data.school.days||[]).map((d,di)=>{const sc=schedByDay[di]||[];return<div key={d} style={{border:'1px solid var(--line)',borderRadius:6,padding:'8px 10px',minWidth:130}}><div style={{fontWeight:600,fontSize:12,marginBottom:4}}>{d.slice(0,3)} · {sc.length}</div>{sc.length?sc.map((sl,i)=>{const subj=data.subjects.find(s=>s.id===sl.subjectId);return<div key={i} style={{fontSize:11,color:'var(--ink-soft)'}}>{sl.start}–{sl.end} {subj?subj.code:'?'}</div>;}):<div style={{fontSize:11,color:'var(--ink-muted)',fontStyle:'italic'}}>free</div>}</div>;})}
-            </div>
-          </div>;
+          expTitle='Personal Timetable – '+(pr?pr.label:'Session')+' Preview';
+          expH=['Day','Periods','Subjects'];
+          expR=daysArr.map((d,di)=>{const sc=schedByDay[di]||[];return[d,sc.length,sc.map(sl=>{const subj=data.subjects.find(s=>s.id===sl.subjectId);return(subj?subj.code:'?')+' ('+sl.className+')';}).join('; ')];});
+        } else if(view==='year'){
+          const weeksPerYear=38;
+          expTitle='Personal Timetable – Academic Year';
+          expSub=tsub+' · '+weekCount+' periods/week · '+weeksPerYear+' weeks';
+          expH=['Metric','Value'];
+          expR=[['Periods / week',weekCount],['Periods / year',weekCount*weeksPerYear],['Hours / year',Math.floor(weekMins*weeksPerYear/60)+'h'],['Subjects',Object.keys(bySubjectWk).length],['Classes',Object.keys(byClassWk).length],['— By Subject',''],
+            ...subjectSummary.map(x=>[x.s.code+' · '+x.s.name,x.n*weeksPerYear+' periods']),
+            ['— By Class',''],
+            ...classSummary.map(x=>[x.name,x.n*weeksPerYear+' periods'])
+          ];
         }
-        if(view==='year'){
-          const weeksPerYear=38;const yrPeriods=weekCount*weeksPerYear;const yrMins=weekMins*weeksPerYear;
-          const bySubj={};schedByDay.forEach(arr=>arr.forEach(sl=>{bySubj[sl.subjectId]=(bySubj[sl.subjectId]||0)+1;}));
-          const byClass={};schedByDay.forEach(arr=>arr.forEach(sl=>{byClass[sl.classId]=(byClass[sl.classId]||0)+1;}));
-          return<div>
-            <div className="grid-4" style={{marginBottom:14}}>
-              <div className="stat"><div className="label">Periods / year</div><div className="val">{yrPeriods}</div><div className="delta">~ {weeksPerYear} teaching weeks</div></div>
-              <div className="stat"><div className="label">Hours / year</div><div className="val">{Math.floor(yrMins/60)}<span style={{fontSize:14}}> hrs</span></div></div>
-              <div className="stat"><div className="label">Subjects</div><div className="val">{Object.keys(bySubj).length}</div></div>
-              <div className="stat"><div className="label">Classes</div><div className="val">{Object.keys(byClass).length}</div></div>
+        return(<div>
+          {/* Always-on counts */}
+          <div className="grid-2" style={{gap:14,marginBottom:14}}>
+            <div style={{padding:'12px 14px',border:'1px solid var(--line)',borderRadius:8,background:'var(--paper)'}}>
+              <div style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--accent)',marginBottom:8}}>Subject-wise · per week</div>
+              {subjectSummary.length?<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{subjectSummary.map(x=>(<span key={x.sId} className="chip" style={{background:x.s.color+'18',color:x.s.color}}><span className="chip-color" style={{background:x.s.color}}></span>{x.s.code}: {x.n}</span>))}</div>:<span style={{fontSize:12,color:'var(--ink-muted)',fontStyle:'italic'}}>No assignments yet.</span>}
             </div>
-            <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>By Subject (yearly periods)</div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>{Object.entries(bySubj).map(([sId,n])=>{const s=data.subjects.find(x=>x.id===sId);if(!s)return null;return<span key={sId} className="chip" style={{background:s.color+'18',color:s.color}}><span className="chip-color" style={{background:s.color}}></span>{s.code}: {n*weeksPerYear}</span>;})}</div>
-            <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>By Class (yearly periods)</div>
-            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{sortClasses(Object.entries(byClass).map(([cId,n])=>({cId,n,...(data.classes.find(x=>x.id===cId)||{})}))).map(x=>(<span key={x.cId} className="chip">{x.name||'?'}: {x.n*weeksPerYear}</span>))}</div>
-            <div style={{fontSize:11,color:'var(--ink-muted)',marginTop:10,fontStyle:'italic'}}>Academic-year estimate assumes {weeksPerYear} teaching weeks. Adjust upward if you run extra sessions.</div>
-          </div>;
-        }
-        return null;
+            <div style={{padding:'12px 14px',border:'1px solid var(--line)',borderRadius:8,background:'var(--paper)'}}>
+              <div style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--warm)',marginBottom:8}}>Standard-wise · per week</div>
+              {classSummary.length?<div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{classSummary.map(x=>(<span key={x.cId} className="chip">{x.name}: {x.n}</span>))}</div>:<span style={{fontSize:12,color:'var(--ink-muted)',fontStyle:'italic'}}>No assignments yet.</span>}
+            </div>
+          </div>
+          <div style={{marginBottom:14,display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+            <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--ink-muted)',fontWeight:600}}>Export:</span>
+            <button className="btn btn-ghost btn-sm" onClick={()=>doExport('pdf',expTitle,expH,expR,expSub)}>PDF</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>doExport('word',expTitle,expH,expR,expSub)}>Word</button>
+            <button className="btn btn-ghost btn-sm" onClick={()=>doExport('excel',expTitle,expH,expR,expSub)}>Excel</button>
+          </div>
+          {view==='day'&&(()=>{
+            const day=daysArr[dayIdx]||'Day';const sched=schedByDay[dayIdx]||[];
+            return<div>
+              <div style={{fontSize:13,color:'var(--ink-soft)',marginBottom:10}}><strong>{day}</strong> — {sched.length} period(s), {sched.reduce((s,sl)=>s+timeDiff(sl.start,sl.end),0)} min</div>
+              {sched.length===0?<div style={{color:'var(--ink-muted)',fontStyle:'italic'}}>Free day.</div>:
+              <table><thead><tr><th>Time</th><th>Period</th><th>Class</th><th>Subject</th></tr></thead><tbody>
+                {sched.map((sl,i)=>{const subj=data.subjects.find(s=>s.id===sl.subjectId);return(<tr key={i}><td className="mono" style={{fontSize:12}}>{sl.start}–{sl.end}</td><td style={{fontSize:12}}>{sl.name}</td><td style={{fontSize:12,fontWeight:600}}>{sl.className}</td><td>{subj?<span className="chip" style={{background:subj.color+'22',color:subj.color}}><span className="chip-color" style={{background:subj.color}}></span>{subj.code} · {subj.name}</span>:'—'}</td></tr>);})}
+              </tbody></table>}
+            </div>;
+          })()}
+          {view==='week'&&(()=>{
+            const allPeriodSets=data.classes.map(c=>getPeriodsForClass(data.school,c));
+            const maxPeriods=Math.max(...allPeriodSets.map(p=>p.length),1);
+            return<div style={{overflowX:'auto'}}>
+              <div style={{fontSize:13,color:'var(--ink-soft)',marginBottom:10}}>Week total: <strong>{weekCount}</strong> periods · <strong>{weekMins}</strong> min ({Math.floor(weekMins/60)}h {weekMins%60}m)</div>
+              <table><thead><tr><th>Period</th>{daysArr.map(d=><th key={d}>{d.slice(0,3)}</th>)}</tr></thead><tbody>
+                {Array.from({length:maxPeriods}).map((_,pi)=>(<tr key={pi}><td className="mono" style={{fontSize:12,color:'var(--ink-muted)'}}>{pi+1}</td>
+                  {daysArr.map((d,di)=>{const slot=(schedByDay[di]||[]).find(s=>s.periodIdx===pi);if(!slot)return<td key={di} style={{color:'var(--ink-muted)',fontSize:12}}>–</td>;const subj=data.subjects.find(s=>s.id===slot.subjectId);return<td key={di} style={{fontSize:12,background:subj?subj.color+'10':''}}><strong>{subj?subj.code:'?'}</strong><br/><span style={{fontSize:10,color:'var(--ink-muted)'}}>{slot.className}</span></td>;})}
+                </tr>))}
+              </tbody></table>
+            </div>;
+          })()}
+          {view==='month'&&(()=>{
+            const weeksInMonth=4;const monthCount=weekCount*weeksInMonth;const monthMins=weekMins*weeksInMonth;
+            return<div>
+              <div className="grid-3" style={{marginBottom:12}}>
+                <div className="stat"><div className="label">Periods / week</div><div className="val">{weekCount}</div></div>
+                <div className="stat"><div className="label">Periods / month</div><div className="val">{monthCount}</div><div className="delta">~ {weeksInMonth} weeks</div></div>
+                <div className="stat"><div className="label">Hours / month</div><div className="val">{Math.floor(monthMins/60)}h {monthMins%60}m</div></div>
+              </div>
+              <div style={{fontSize:11,color:'var(--ink-muted)',marginTop:6,fontStyle:'italic'}}>Estimated from 4 teaching weeks per month. Actual monthly count varies with holidays.</div>
+            </div>;
+          })()}
+          {view==='session'&&(()=>{
+            const pr=SESSION_PRESETS[sessionPreview];
+            if(!pr)return<div className="empty-state">Unknown session.</div>;
+            const priP=buildSessionPeriods(pr.primary);const upP=buildSessionPeriods(pr.upper);const prP=buildSessionPeriods(pr.preprimary);
+            const teachPri=priP.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
+            const teachUp=upP.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
+            const teachPre=prP.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
+            return<div>
+              <div style={{fontSize:13,color:'var(--ink-soft)',marginBottom:12}}>Previewing how the periods are structured in <strong>{pr.label}</strong> ({pr.months}) — current assignments in the grid are kept. Period timings below reflect the session template.</div>
+              <div className="grid-3" style={{marginBottom:14}}>
+                <div className="stat"><div className="label">Primary teaching/day</div><div className="val">{teachPri}<span style={{fontSize:14}}> min</span></div></div>
+                <div className="stat"><div className="label">Upper teaching/day</div><div className="val">{teachUp}<span style={{fontSize:14}}> min</span></div></div>
+                <div className="stat"><div className="label">Pre-Pri teaching/day</div><div className="val">{teachPre}<span style={{fontSize:14}}> min</span></div></div>
+              </div>
+              <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Weekly assignments for this teacher</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+                {daysArr.map((d,di)=>{const sc=schedByDay[di]||[];return<div key={d} style={{border:'1px solid var(--line)',borderRadius:6,padding:'8px 10px',minWidth:130}}><div style={{fontWeight:600,fontSize:12,marginBottom:4}}>{d.slice(0,3)} · {sc.length}</div>{sc.length?sc.map((sl,i)=>{const subj=data.subjects.find(s=>s.id===sl.subjectId);return<div key={i} style={{fontSize:11,color:'var(--ink-soft)'}}>{sl.start}–{sl.end} {subj?subj.code:'?'}</div>;}):<div style={{fontSize:11,color:'var(--ink-muted)',fontStyle:'italic'}}>free</div>}</div>;})}
+              </div>
+            </div>;
+          })()}
+          {view==='year'&&(()=>{
+            const weeksPerYear=38;const yrPeriods=weekCount*weeksPerYear;const yrMins=weekMins*weeksPerYear;
+            return<div>
+              <div className="grid-4" style={{marginBottom:14}}>
+                <div className="stat"><div className="label">Periods / year</div><div className="val">{yrPeriods}</div><div className="delta">~ {weeksPerYear} teaching weeks</div></div>
+                <div className="stat"><div className="label">Hours / year</div><div className="val">{Math.floor(yrMins/60)}<span style={{fontSize:14}}> hrs</span></div></div>
+                <div className="stat"><div className="label">Subjects</div><div className="val">{Object.keys(bySubjectWk).length}</div></div>
+                <div className="stat"><div className="label">Classes</div><div className="val">{Object.keys(byClassWk).length}</div></div>
+              </div>
+              <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>By Subject (yearly periods)</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>{subjectSummary.map(x=>(<span key={x.sId} className="chip" style={{background:x.s.color+'18',color:x.s.color}}><span className="chip-color" style={{background:x.s.color}}></span>{x.s.code}: {x.n*weeksPerYear}</span>))}</div>
+              <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>By Class (yearly periods)</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{classSummary.map(x=>(<span key={x.cId} className="chip">{x.name||'?'}: {x.n*weeksPerYear}</span>))}</div>
+              <div style={{fontSize:11,color:'var(--ink-muted)',marginTop:10,fontStyle:'italic'}}>Academic-year estimate assumes {weeksPerYear} teaching weeks.</div>
+            </div>;
+          })()}
+        </div>);
       })():<div style={{color:'var(--ink-muted)',fontStyle:'italic',padding:'12px 0'}}>Click a teacher row above, or pick one here to view their personal timetable.</div>}
     </div>
   </div>);
