@@ -378,7 +378,17 @@ const DEFAULT_DATA = {
     preprimaryStart:'08:30', primaryStart:'08:00', upperStart:'08:15',
     preprimaryPeriods:buildSessionPeriods(SESSION_PRESETS.normal.preprimary),
     primaryPeriods:buildSessionPeriods(SESSION_PRESETS.normal.primary),
-    upperPeriods:buildSessionPeriods(SESSION_PRESETS.normal.upper)},
+    upperPeriods:buildSessionPeriods(SESSION_PRESETS.normal.upper),
+    // Day-category split: weekdays (full academic days), activity (half-day / activity focus),
+    // bagless (special monthly day with its own period structure). Each category carries its
+    // own per-group period grid so the lecture arrangement differs per day type.
+    dayCategories:{weekdays:['Monday','Tuesday','Thursday','Friday'],activity:['Wednesday','Saturday'],bagless:[]},
+    baglessRule:'lastOfMonth',
+    categoryPeriods:{
+      weekdays:{preprimaryStart:'08:30',primaryStart:'08:00',upperStart:'08:15',preprimaryPeriods:buildSessionPeriods(SESSION_PRESETS.normal.preprimary),primaryPeriods:buildSessionPeriods(SESSION_PRESETS.normal.primary),upperPeriods:buildSessionPeriods(SESSION_PRESETS.normal.upper)},
+      activity:{preprimaryStart:'08:30',primaryStart:'08:00',upperStart:'08:15',preprimaryPeriods:buildSessionPeriods(SESSION_PRESETS.normal.preprimary),primaryPeriods:buildSessionPeriods(SESSION_PRESETS.normal.primary),upperPeriods:buildSessionPeriods(SESSION_PRESETS.normal.upper)},
+      bagless:{preprimaryStart:'08:30',primaryStart:'08:00',upperStart:'08:15',preprimaryPeriods:buildSessionPeriods(SESSION_PRESETS.normal.preprimary),primaryPeriods:buildSessionPeriods(SESSION_PRESETS.normal.primary),upperPeriods:buildSessionPeriods(SESSION_PRESETS.normal.upper)}
+    }},
   classes:DEFAULT_CLASSES, teachers:DEFAULT_TEACHERS, subjects:ICSE_SUBJECTS, qualMaster:DEFAULT_QUAL_MASTER,
   lectureLimits:LECTURE_LIMITS,
   rooms:[{id:'r1',name:'Classroom 1'},{id:'r2',name:'Classroom 2'},{id:'r3',name:'Classroom 3'},{id:'r4',name:'Computer Lab'},{id:'r5',name:'Library'},{id:'r6',name:'Playground'}],
@@ -428,6 +438,31 @@ function migrateData(old){
   if(old.school&&old.school.periods&&!old.school.primaryPeriods){old.school.primaryPeriods=old.school.periods;old.school.upperPeriods=old.school.periods;}
   if(old.school&&!old.school.activeSession) old.school.activeSession='normal';
   if(old.school&&!old.school.preprimaryPeriods) old.school.preprimaryPeriods=buildSessionPeriods(SESSION_PRESETS.normal.preprimary);
+  // Day categories: weekdays / activity days / bag-less day. Split existing school.days
+  // into the standard pattern (Mon/Tue/Thu/Fri = weekdays, Wed/Sat = activity).
+  if(old.school){
+    if(!old.school.dayCategories){
+      const d=old.school.days||['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      old.school.dayCategories={
+        weekdays:d.filter(x=>['Monday','Tuesday','Thursday','Friday'].includes(x)),
+        activity:d.filter(x=>['Wednesday','Saturday'].includes(x)),
+        bagless:[]
+      };
+    }
+    if(!old.school.baglessRule) old.school.baglessRule='lastOfMonth';
+    // Per-category period grids — clone the currently-saved arrays as the starting point.
+    if(!old.school.categoryPeriods){
+      const mk=()=>({
+        preprimaryStart:old.school.preprimaryStart||'08:30',
+        primaryStart:old.school.primaryStart||'08:00',
+        upperStart:old.school.upperStart||'08:15',
+        preprimaryPeriods:(old.school.preprimaryPeriods||buildSessionPeriods(SESSION_PRESETS.normal.preprimary)).map(p=>({...p})),
+        primaryPeriods:(old.school.primaryPeriods||buildSessionPeriods(SESSION_PRESETS.normal.primary)).map(p=>({...p})),
+        upperPeriods:(old.school.upperPeriods||buildSessionPeriods(SESSION_PRESETS.normal.upper)).map(p=>({...p}))
+      });
+      old.school.categoryPeriods={weekdays:mk(),activity:mk(),bagless:mk()};
+    }
+  }
   if(!old.qualMaster) old.qualMaster=DEFAULT_QUAL_MASTER.map(q=>({...q}));
   if(!old.rooms) old.rooms=[{id:'r1',name:'Classroom 1'},{id:'r2',name:'Classroom 2'},{id:'r3',name:'Computer Lab'},{id:'r4',name:'Library'},{id:'r5',name:'Playground'}];
   if(old.teachers) old.teachers=migrateTeachers(old.teachers, old.qualMaster);
@@ -659,18 +694,56 @@ function Dashboard({data,setTab}){
 }
 
 // ===== SchoolSetup =====
+const DAY_CATEGORY_LABELS={weekdays:'Weekdays',activity:'Activity Days',bagless:'Bag Less Day'};
+const DAY_CATEGORY_DESC={weekdays:'Full academic days with the regular period grid.',activity:'Half-day or activity-focused schedule (e.g. Wed & Sat).',bagless:'Special no-bag day — runs on the last day of each month by default.'};
 function SchoolSetup({data,update}){
-  const[session,setSession]=useState(data.school.activeSession||'normal');const[group,setGroup]=useState('primary');
-  const getPeriods=g=>{if(g==='preprimary')return data.school.preprimaryPeriods||[];if(g==='upper')return data.school.upperPeriods||data.school.primaryPeriods;return data.school.primaryPeriods;};
-  const getStart=g=>{if(g==='preprimary')return data.school.preprimaryStart||'08:30';if(g==='upper')return data.school.upperStart||'08:15';return data.school.primaryStart||'08:00';};
-  const[edited,setEdited]=useState(getPeriods(group).map(p=>({...p})));
-  const[startTime,setStartTime]=useState(getStart(group));
-  const[days,setDays]=useState(data.school.days);
-  useEffect(()=>{setEdited(getPeriods(group).map(x=>({...x})));setStartTime(getStart(group));},[group,data.school.primaryPeriods,data.school.upperPeriods,data.school.preprimaryPeriods]);
-  const recalcTimes=()=>{setEdited(calcTimes(startTime,edited));};
+  const[session,setSession]=useState(data.school.activeSession||'normal');
+  const[group,setGroup]=useState('primary');
+  const[category,setCategory]=useState('weekdays');
+  const dayCats=data.school.dayCategories||{weekdays:[],activity:[],bagless:[]};
+  const catPeriods=data.school.categoryPeriods||{};
+  const getPeriods=(cat,g)=>{const cp=catPeriods[cat]||{};const key=g==='preprimary'?'preprimaryPeriods':g==='upper'?'upperPeriods':'primaryPeriods';return(cp[key]||[]).map(p=>({...p}));};
+  const getStart=(cat,g)=>{const cp=catPeriods[cat]||{};const key=g==='preprimary'?'preprimaryStart':g==='upper'?'upperStart':'primaryStart';return cp[key]||(g==='preprimary'?'08:30':g==='upper'?'08:15':'08:00');};
+  const[edited,setEdited]=useState(getPeriods(category,group));
+  const[startTime,setStartTime]=useState(getStart(category,group));
+  const[catDays,setCatDays]=useState({weekdays:[...(dayCats.weekdays||[])],activity:[...(dayCats.activity||[])],bagless:[...(dayCats.bagless||[])]});
+  const[baglessRule,setBaglessRule]=useState(data.school.baglessRule||'lastOfMonth');
+  useEffect(()=>{setEdited(getPeriods(category,group));setStartTime(getStart(category,group));},[category,group,data.school.categoryPeriods]);
   useEffect(()=>{setEdited(prev=>calcTimes(startTime,prev));},[startTime]);
-  const loadSession=k=>{setSession(k);const pr=SESSION_PRESETS[k];update({school:{...data.school,activeSession:k,preprimaryPeriods:buildSessionPeriods(pr.preprimary),primaryPeriods:buildSessionPeriods(pr.primary),upperPeriods:buildSessionPeriods(pr.upper),preprimaryStart:pr.preprimary.startTime,primaryStart:pr.primary.startTime,upperStart:pr.upper.startTime}});};
-  const save=()=>{const recalced=calcTimes(startTime,edited);const startKey=group==='preprimary'?'preprimaryStart':group==='upper'?'upperStart':'primaryStart';const periodKey=group==='preprimary'?'preprimaryPeriods':group==='upper'?'upperPeriods':'primaryPeriods';update({school:{...data.school,[periodKey]:recalced,[startKey]:startTime,days,activeSession:session}});};
+  const loadSession=k=>{
+    setSession(k);
+    const pr=SESSION_PRESETS[k];
+    // Session preset refreshes the weekdays grids (activity/bagless keep custom edits)
+    const mkCat=()=>({preprimaryStart:pr.preprimary.startTime,primaryStart:pr.primary.startTime,upperStart:pr.upper.startTime,preprimaryPeriods:buildSessionPeriods(pr.preprimary),primaryPeriods:buildSessionPeriods(pr.primary),upperPeriods:buildSessionPeriods(pr.upper)});
+    const next={...(data.school.categoryPeriods||{}),weekdays:mkCat()};
+    if(!next.activity)next.activity=mkCat();
+    if(!next.bagless)next.bagless=mkCat();
+    update({school:{...data.school,activeSession:k,categoryPeriods:next,preprimaryPeriods:next.weekdays.preprimaryPeriods,primaryPeriods:next.weekdays.primaryPeriods,upperPeriods:next.weekdays.upperPeriods,preprimaryStart:next.weekdays.preprimaryStart,primaryStart:next.weekdays.primaryStart,upperStart:next.weekdays.upperStart}});
+  };
+  const toggleCatDay=(cat,d)=>setCatDays(s=>{const arr=s[cat].includes(d)?s[cat].filter(x=>x!==d):[...s[cat],d];const next={...s,[cat]:arr};// ensure a day appears in at most one category
+    for(const c of['weekdays','activity','bagless'])if(c!==cat)next[c]=next[c].filter(x=>x!==d);
+    return next;});
+  const save=()=>{
+    const recalced=calcTimes(startTime,edited);
+    const startKey=group==='preprimary'?'preprimaryStart':group==='upper'?'upperStart':'primaryStart';
+    const periodKey=group==='preprimary'?'preprimaryPeriods':group==='upper'?'upperPeriods':'primaryPeriods';
+    const cp={...(data.school.categoryPeriods||{})};
+    cp[category]={...(cp[category]||{}),[periodKey]:recalced,[startKey]:startTime};
+    // Derive top-level school.days from the union of all day-categories so other tabs
+    // (Proxy Management, etc.) keep seeing a consistent working-days list.
+    const daysUnion=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].filter(d=>catDays.weekdays.includes(d)||catDays.activity.includes(d)||catDays.bagless.includes(d));
+    // Keep legacy top-level *Periods mirrored to the weekdays category so Timetable
+    // Builder and other consumers continue to render using the main grid until they
+    // adopt per-category awareness.
+    const patch={dayCategories:{...catDays},baglessRule,categoryPeriods:cp,days:daysUnion,activeSession:session};
+    if(category==='weekdays'){patch[periodKey]=recalced;patch[startKey]=startTime;}
+    else{// make sure weekdays fields still reflect the weekdays category
+      const w=cp.weekdays||{};
+      if(w.preprimaryPeriods)patch.preprimaryPeriods=w.preprimaryPeriods;if(w.primaryPeriods)patch.primaryPeriods=w.primaryPeriods;if(w.upperPeriods)patch.upperPeriods=w.upperPeriods;
+      if(w.preprimaryStart)patch.preprimaryStart=w.preprimaryStart;if(w.primaryStart)patch.primaryStart=w.primaryStart;if(w.upperStart)patch.upperStart=w.upperStart;
+    }
+    update({school:{...data.school,...patch}});
+  };
   const updP=(i,k,v)=>setEdited(p=>{const n=[...p];n[i]={...n[i],[k]:v};if(k==='duration')return calcTimes(startTime,n);return n;});
   const addP=()=>setEdited(p=>calcTimes(startTime,[...p,{name:'New',duration:35}]));
   const remP=i=>setEdited(p=>calcTimes(startTime,p.filter((_,idx)=>idx!==i)));
@@ -681,23 +754,69 @@ function SchoolSetup({data,update}){
   const totalTeaching=edited.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
   const totalDay=edited.reduce((s,p)=>s+(p.duration||0),0);
   const groupLabel=group==='preprimary'?'Pre-Primary':group==='upper'?'Upper':'Primary';
+  const categoryLabel=DAY_CATEGORY_LABELS[category]||category;
   const dsExpH=['#','Label','Duration','Start','End','Type'];
   const dsExpR=edited.map((p,i)=>[String(i+1).padStart(2,'0'),p.name,(p.duration||0)+' min',p.start||'',p.end||'',tLabel(p)]);
+  const renderDayRow=(cat)=>(
+    <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+      {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d=>(
+        <button key={d} onClick={()=>toggleCatDay(cat,d)} className={catDays[cat].includes(d)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{d}</button>
+      ))}
+    </div>
+  );
   return(<div>
-    <div className="pagehead"><div><h1 className="serif">Day <em>Structure</em></h1><div className="sub">Set start time + duration per period. Times auto-calculate. Pre-Primary, Primary, and Upper grids are independent.</div></div><div className="actions">
-      <ExportBar title={'Day Structure – '+groupLabel} headers={dsExpH} rows={dsExpR} subtitle={SESSION_PRESETS[session].label+' Session'}/>
+    <div className="pagehead"><div><h1 className="serif">Day <em>Structure</em></h1><div className="sub">Three day categories — each with its own Pre-Primary / Primary / Upper period grid. Pick a category, then a group, then edit.</div></div><div className="actions">
+      <ExportBar title={'Day Structure – '+categoryLabel+' · '+groupLabel} headers={dsExpH} rows={dsExpR} subtitle={SESSION_PRESETS[session].label+' Session'}/>
       <button className="btn btn-primary" onClick={save}>Save Changes</button></div></div>
     <div className="card"><div className="card-title">Session Presets</div><div className="grid-3">{Object.entries(SESSION_PRESETS).map(([k,pr])=>(<button key={k} onClick={()=>loadSession(k)} style={{textAlign:'left',padding:'16px 18px',border:session===k?'2px solid var(--accent)':'1px solid var(--line)',borderRadius:8,background:session===k?'var(--accent)':'var(--paper)',color:session===k?'var(--paper)':'var(--ink)',cursor:'pointer'}}><div style={{fontWeight:600,fontSize:14}}>{pr.label}</div><div style={{fontSize:12,opacity:.7}}>{pr.months}</div></button>))}</div></div>
-    <div className="card"><div className="card-title">Working Days</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d=>(<button key={d} onClick={()=>setDays(ds=>ds.includes(d)?ds.filter(x=>x!==d):[...ds,d])} className={days.includes(d)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{d}</button>))}</div></div>
+
     <div className="card">
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
-        <div style={{display:'flex',alignItems:'center',gap:16}}><div className="card-title" style={{margin:0}}>Period Grid</div>
+      <div className="card-title">Working Days</div>
+      <div style={{display:'grid',gap:12}}>
+        <div style={{padding:'12px 14px',border:'1px solid var(--line)',borderRadius:8,background:'var(--paper)'}}>
+          <div style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--accent)',marginBottom:4}}>Weekdays</div>
+          <div style={{fontSize:12,color:'var(--ink-muted)',marginBottom:8}}>{DAY_CATEGORY_DESC.weekdays}</div>
+          {renderDayRow('weekdays')}
+        </div>
+        <div style={{padding:'12px 14px',border:'1px solid var(--line)',borderRadius:8,background:'var(--paper)'}}>
+          <div style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--warm)',marginBottom:4}}>Activity Days</div>
+          <div style={{fontSize:12,color:'var(--ink-muted)',marginBottom:8}}>{DAY_CATEGORY_DESC.activity}</div>
+          {renderDayRow('activity')}
+        </div>
+        <div style={{padding:'12px 14px',border:'1px solid var(--line)',borderRadius:8,background:'var(--paper)'}}>
+          <div style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--ink-soft)',marginBottom:4}}>Bag Less Day</div>
+          <div style={{fontSize:12,color:'var(--ink-muted)',marginBottom:8}}>{DAY_CATEGORY_DESC.bagless}</div>
+          <div style={{display:'flex',gap:12,alignItems:'center',flexWrap:'wrap',marginBottom:catDays.bagless.length?8:0}}>
+            <label style={{fontSize:11.5,color:'var(--ink-soft)'}}>Rule:</label>
+            <select value={baglessRule} onChange={e=>setBaglessRule(e.target.value)} style={{padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontSize:12.5}}>
+              <option value="lastOfMonth">Last day of every month</option>
+              <option value="firstOfMonth">First day of every month</option>
+              <option value="manual">Manual — pick specific weekdays below</option>
+            </select>
+          </div>
+          {baglessRule==='manual'&&renderDayRow('bagless')}
+        </div>
+      </div>
+    </div>
+
+    <div className="card">
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14,flexWrap:'wrap',gap:12}}>
+        <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+          <div className="card-title" style={{margin:0}}>Period Grid</div>
+          <div className="tab-bar">
+            <button className={`tab-btn ${category==='weekdays'?'active':''}`} onClick={()=>setCategory('weekdays')}>Weekdays</button>
+            <button className={`tab-btn ${category==='activity'?'active':''}`} onClick={()=>setCategory('activity')}>Activity</button>
+            <button className={`tab-btn ${category==='bagless'?'active':''}`} onClick={()=>setCategory('bagless')}>Bag Less</button>
+          </div>
           <div className="tab-bar">
             <button className={`tab-btn ${group==='preprimary'?'active':''}`} onClick={()=>setGroup('preprimary')}>Pre-Primary</button>
             <button className={`tab-btn ${group==='primary'?'active':''}`} onClick={()=>setGroup('primary')}>Primary (1–4)</button>
             <button className={`tab-btn ${group==='upper'?'active':''}`} onClick={()=>setGroup('upper')}>Upper (5–10)</button>
           </div>
-        </div><button className="btn btn-ghost btn-sm" onClick={addP}>+ Add</button></div>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={addP}>+ Add</button>
+      </div>
+      <div style={{fontSize:12,color:'var(--ink-muted)',marginBottom:10}}>Editing <strong style={{color:'var(--ink)'}}>{categoryLabel}</strong> · <strong style={{color:'var(--ink)'}}>{groupLabel}</strong></div>
       <div style={{display:'flex',gap:16,alignItems:'center',marginBottom:12,flexWrap:'wrap'}}>
         <div style={{display:'flex',alignItems:'center',gap:8}}><label style={{fontSize:12,fontWeight:500,color:'var(--ink-soft)'}}>Start Time:</label><input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} style={{padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontWeight:600}}/></div>
         <span style={{fontSize:12,color:'var(--ink-muted)'}}>{getTeachingCount(edited)} teaching periods | Teaching: {totalTeaching} min | Total day: {totalDay} min ({Math.floor(totalDay/60)}h {totalDay%60}m)</span>
