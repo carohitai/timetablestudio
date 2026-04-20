@@ -1096,7 +1096,10 @@ function AllocatePage({data,update}){
 // ===== Timetable =====
 function TimetablePage({data,update}){
   const[classId,setClassId]=useState(data.classes[0]?data.classes[0].id:'');const[picker,setPicker]=useState(null);
-  const[dayFilter,setDayFilter]=useState('all');
+  const[dayFilter,setDayFilter]=useState([]); // array of selected day indices; empty = All Days
+  const toggleDay=i=>setDayFilter(a=>a.includes(i)?a.filter(x=>x!==i):[...a,i].sort((x,y)=>x-y));
+  const selectAllDays=()=>setDayFilter([]);
+  const showingAll=!dayFilter.length||dayFilter.length===data.school.days.length;
   const conflicts=useMemo(()=>findConflicts(data.timetable,data.classes,data.school),[data.timetable,data.classes,data.school]);
   useEffect(()=>{if(!classId&&data.classes[0])setClassId(data.classes[0].id);},[data.classes,classId]);
 
@@ -1255,12 +1258,13 @@ function TimetablePage({data,update}){
     <div className="tt-toolbar no-print" style={{marginTop:-4}}>
       <span style={{fontSize:11,fontWeight:500,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.1em'}}>View:</span>
       <div className="tab-bar" style={{flexWrap:'wrap'}}>
-        <button className={`tab-btn ${dayFilter==='all'?'active':''}`} onClick={()=>setDayFilter('all')}>All Days</button>
-        {data.school.days.map((d,i)=>(<button key={d} className={`tab-btn ${dayFilter===String(i)?'active':''}`} onClick={()=>setDayFilter(String(i))}>{d.slice(0,3)}</button>))}
+        <button className={`tab-btn ${showingAll?'active':''}`} onClick={selectAllDays}>All Days</button>
+        {data.school.days.map((d,i)=>(<button key={d} className={`tab-btn ${!showingAll&&dayFilter.includes(i)?'active':''}`} onClick={()=>toggleDay(i)}>{d.slice(0,3)}</button>))}
       </div>
+      <span style={{fontSize:11,color:'var(--ink-muted)'}}>{showingAll?'All '+data.school.days.length+' days':dayFilter.length+' of '+data.school.days.length+' days'}</span>
     </div>
     {(()=>{
-      const visibleIndices=dayFilter==='all'?data.school.days.map((_,i)=>i):(data.school.days[Number(dayFilter)]!==undefined?[Number(dayFilter)]:data.school.days.map((_,i)=>i));
+      const visibleIndices=showingAll?data.school.days.map((_,i)=>i):dayFilter.slice();
       return(
     <div className="tt-grid" style={{'--cols':visibleIndices.length}}>
       <div className="tt-row"><div className="tt-cell header">Period</div>{visibleIndices.map(di=><div key={di} className="tt-cell header">{data.school.days[di]}</div>)}</div>
@@ -1381,7 +1385,23 @@ function LoadPage({data}){
 // ===== Proxy Management =====
 function ProxyPage({data,update}){
   const[dayIdx,setDayIdx]=useState(0);const[absentIds,setAbsentIds]=useState([]);const[assignments,setAssignments]=useState({});
+  const[dateStr,setDateStr]=useState('');const[dateErr,setDateErr]=useState('');
   const toggleAbsent=id=>setAbsentIds(a=>a.includes(id)?a.filter(x=>x!==id):[...a,id]);
+
+  // Date -> day-of-week mapping. Parse yyyy-mm-dd locally to avoid UTC drift.
+  const WEEKDAYS=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const dateFromStr=s=>{if(!s||!/^\d{4}-\d{2}-\d{2}$/.test(s))return null;const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d);};
+  const onDateChange=s=>{
+    setDateStr(s);setDateErr('');
+    const dt=dateFromStr(s);if(!dt){return;}
+    const wd=WEEKDAYS[dt.getDay()];
+    const i=data.school.days.findIndex(d=>d===wd);
+    if(i>=0){setDayIdx(i);}
+    else{setDateErr(wd+' is not a working day. Schedule unchanged.');}
+  };
+  const prettyDate=()=>{const dt=dateFromStr(dateStr);if(!dt)return'';return dt.toLocaleDateString('en-IN',{weekday:'long',year:'numeric',month:'long',day:'numeric'});};
+  // Compact date label suitable for headers/print (e.g. "Wed, 22 Apr 2026")
+  const compactDate=()=>{const dt=dateFromStr(dateStr);if(!dt)return new Date().toLocaleDateString('en-IN');return dt.toLocaleDateString('en-IN',{weekday:'short',year:'numeric',month:'short',day:'numeric'});};
 
   // Build absent teachers' schedules for the selected day
   const absentSchedules=useMemo(()=>{
@@ -1403,8 +1423,8 @@ function ProxyPage({data,update}){
       if(!proxy)return;if(!byProxy[proxyId])byProxy[proxyId]={teacher:proxy,slots:[]};
       byProxy[proxyId].slots.push({start:pStart,end:pEnd,className:cls?cls.name:'?',subjectName:subj?subj.name:'?',absentName:absent?absent.name:'?'});
     });
-    // Open print window
-    const dayName=data.school.days[dayIdx];const date=new Date().toLocaleDateString('en-IN');
+    // Open print window — use the picked calendar date if set, otherwise today's date
+    const dayName=data.school.days[dayIdx];const date=compactDate();
     let html='<html><head><title>Proxy Slips</title><style>body{font-family:Arial,sans-serif;padding:20px}h2{margin:0 0 4px}table{width:100%;border-collapse:collapse;margin:8px 0 24px}th,td{border:1px solid #999;padding:8px;text-align:left;font-size:13px}th{background:#f0f0f0}.slip{page-break-after:always;padding:20px;border:2px solid #333;margin-bottom:24px;border-radius:8px}@media print{.slip{page-break-after:always}}</style></head><body>';
     html+='<div style="text-align:center;margin-bottom:20px"><h1>The World School, ICSE — Proxy Schedule</h1><p>'+dayName+' · '+date+'</p></div>';
     Object.values(byProxy).forEach(({teacher:pr,slots})=>{
@@ -1417,7 +1437,7 @@ function ProxyPage({data,update}){
   };
 
   const printConsolidatedReport=()=>{
-    const dayName=data.school.days[dayIdx];const date=new Date().toLocaleDateString('en-IN');
+    const dayName=data.school.days[dayIdx];const date=compactDate();
     const allAssigned=Object.entries(assignments).filter(([k,v])=>v).map(([key,proxyId])=>{
       const parts=key.split('|');const absent=data.teachers.find(t=>t.id===parts[0]);const proxy=data.teachers.find(t=>t.id===proxyId);
       const cls=data.classes.find(c=>c.id===parts[3]);const subj=data.subjects.find(s=>s.id===parts[4]);
@@ -1443,8 +1463,12 @@ function ProxyPage({data,update}){
     </div>
 
     <div className="card">
-      <div className="grid-2">
-        <div className="field"><label>Day</label><SearchSelect value={String(dayIdx)} options={dayOpts} onChange={v=>setDayIdx(Number(v))}/></div>
+      <div className="grid-3">
+        <div className="field"><label>Date (optional)</label><input type="date" value={dateStr} onChange={e=>onDateChange(e.target.value)} style={{padding:'9px 12px',border:'1px solid var(--line)',borderRadius:6,background:'var(--paper)',width:'100%'}}/>
+          {dateStr&&!dateErr&&<div style={{fontSize:11,color:'var(--ink-muted)',marginTop:4}}>{prettyDate()}</div>}
+          {dateErr&&<div style={{fontSize:11,color:'var(--danger)',marginTop:4}}>{dateErr}</div>}
+        </div>
+        <div className="field"><label>Day</label><SearchSelect value={String(dayIdx)} options={dayOpts} onChange={v=>{setDayIdx(Number(v));}}/></div>
         <div className="field"><label>Add Absent Teacher</label>
           <SearchSelect value="" options={[{value:'',label:'-- Select teacher --'},...data.teachers.filter(t=>!absentIds.includes(t.id)).map(t=>({value:t.id,label:t.code+' – '+t.name}))]} onChange={v=>{if(v)setAbsentIds(a=>[...a,v])}} placeholder="Search by name or code..."/>
         </div>
