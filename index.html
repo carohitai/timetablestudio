@@ -1095,20 +1095,35 @@ function AllocatePage({data,update}){
 
 // ===== Timetable =====
 function TimetablePage({data,update}){
+  // Timetable Builder is intentionally INDEPENDENT of Day Structure:
+  // it always uses the standard Mon-Sat working week and a local session
+  // selection so that changing days or session in Day Structure cannot
+  // accidentally hide or reshape an existing class timetable.
+  const TB_DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const[classId,setClassId]=useState(data.classes[0]?data.classes[0].id:'');const[picker,setPicker]=useState(null);
   const[dayFilter,setDayFilter]=useState([]); // array of selected day indices; empty = All Days
+  const[tbSession,setTbSession]=useState(data.school.activeSession||'normal');
   const toggleDay=i=>setDayFilter(a=>a.includes(i)?a.filter(x=>x!==i):[...a,i].sort((x,y)=>x-y));
   const selectAllDays=()=>setDayFilter([]);
-  const showingAll=!dayFilter.length||dayFilter.length===data.school.days.length;
-  const conflicts=useMemo(()=>findConflicts(data.timetable,data.classes,data.school),[data.timetable,data.classes,data.school]);
+  const showingAll=!dayFilter.length||dayFilter.length===TB_DAYS.length;
+  // Build period grids locally for the chosen session so Day Structure edits don't bleed in.
+  const tbPeriods=useMemo(()=>{
+    const pr=SESSION_PRESETS[tbSession];
+    if(!pr)return{preprimary:data.school.preprimaryPeriods||[],primary:data.school.primaryPeriods||[],upper:data.school.upperPeriods||data.school.primaryPeriods||[]};
+    return{preprimary:buildSessionPeriods(pr.preprimary),primary:buildSessionPeriods(pr.primary),upper:buildSessionPeriods(pr.upper)};
+  },[tbSession,data.school.preprimaryPeriods,data.school.primaryPeriods,data.school.upperPeriods]);
+  // Effective school used for conflict detection and helpers, without mutating data.school.
+  const tbSchool=useMemo(()=>({...data.school,days:TB_DAYS,preprimaryPeriods:tbPeriods.preprimary,primaryPeriods:tbPeriods.primary,upperPeriods:tbPeriods.upper}),[data.school,tbPeriods]);
+  const getTbPeriods=c=>{if(!c)return tbPeriods.primary;return c.group==='preprimary'?tbPeriods.preprimary:c.group==='upper'?tbPeriods.upper:tbPeriods.primary;};
+  const conflicts=useMemo(()=>findConflicts(data.timetable,data.classes,tbSchool),[data.timetable,data.classes,tbSchool]);
   useEffect(()=>{if(!classId&&data.classes[0])setClassId(data.classes[0].id);},[data.classes,classId]);
 
-  // Session switcher
-  const switchSession=k=>{const pr=SESSION_PRESETS[k];update({school:{...data.school,activeSession:k,preprimaryPeriods:buildSessionPeriods(pr.preprimary),primaryPeriods:buildSessionPeriods(pr.primary),upperPeriods:buildSessionPeriods(pr.upper),preprimaryStart:pr.preprimary.startTime,primaryStart:pr.primary.startTime,upperStart:pr.upper.startTime}});};
-  const activeSession=data.school.activeSession||'normal';
+  // Session switcher — local only; does NOT update data.school
+  const switchSession=k=>setTbSession(k);
+  const activeSession=tbSession;
 
   if(!data.classes.length)return<div><div className="pagehead"><div><h1 className="serif"><em>Timetable</em></h1></div></div><div className="card"><div className="empty-state"><h3>Add classes first</h3></div></div></div>;
-  const cls=data.classes.find(c=>c.id===classId);const pList=cls?getPeriodsForClass(data.school,cls):data.school.primaryPeriods;const tCount=getTeachingCount(pList);
+  const cls=data.classes.find(c=>c.id===classId);const pList=cls?getTbPeriods(cls):tbPeriods.primary;const tCount=getTeachingCount(pList);
   const setCell=(sId,roomId)=>{if(!picker)return;const tId=sId?data.allocations[allocKey(classId,sId)]:null;const tt=JSON.parse(JSON.stringify(data.timetable));if(!tt[classId])tt[classId]={};if(!tt[classId][picker.d])tt[classId][picker.d]={};if(sId)tt[classId][picker.d][picker.p]={subjectId:sId,teacherId:tId||null,roomId:roomId||null};else delete tt[classId][picker.d][picker.p];update({timetable:tt});setPicker(null);};
   const clearClass=()=>{if(!confirm('Clear?'))return;const tt={...data.timetable};delete tt[classId];update({timetable:tt});};
 
@@ -1116,7 +1131,7 @@ function TimetablePage({data,update}){
   const autoFill=()=>{
     const al=Object.entries(data.allocations).filter(([k])=>k.startsWith(classId+'|'));
     if(!al.length){alert('No allocations for this class.');return;}
-    const ws=tCount*data.school.days.length;
+    const ws=tCount*TB_DAYS.length;
     const cnt={};const ps=Math.floor(ws/al.length);
     al.forEach(([k])=>cnt[k.split('|')[1]]=ps);
     let rem=ws-ps*al.length;
@@ -1133,7 +1148,7 @@ function TimetablePage({data,update}){
     const busyMap={};
     data.classes.forEach(c=>{
       if(c.id===classId) return; // skip the class we're filling
-      const cPList=getPeriodsForClass(data.school,c);
+      const cPList=getPeriodsForClass(tbSchool,c);
       const cTT=data.timetable[c.id]||{};
       Object.keys(cTT).forEach(dIdx=>{
         Object.keys(cTT[dIdx]||{}).forEach(pIdx=>{
@@ -1147,9 +1162,9 @@ function TimetablePage({data,update}){
         });
       });
     });
-    // Get teaching positions for this class
+    // Get teaching positions for this class (uses TB_DAYS, not Day Structure days)
     const positions=[];
-    data.school.days.forEach((_,dIdx)=>{
+    TB_DAYS.forEach((_,dIdx)=>{
       pList.forEach((p,pIdx)=>{if(!isNonTeaching(p)) positions.push({dIdx,pIdx,start:p.start,end:p.end});});
     });
     const tt=JSON.parse(JSON.stringify(data.timetable));
@@ -1230,13 +1245,13 @@ function TimetablePage({data,update}){
   };
 
   const clsOpts=data.classes.map(c=>({value:c.id,label:c.name+' ('+(c.group==='preprimary'?'Pre-Pri':c.group==='upper'?'Upper':'Primary')+')'}));
-  const ttExpH=['Period',...data.school.days.map(d=>d.slice(0,3))];
-  const ttExpR=pList.map((p,pi)=>[p.name+' ('+p.start+'–'+p.end+')',...data.school.days.map((_,di)=>{if(isNonTeaching(p))return p.name;const cell=data.timetable[classId]&&data.timetable[classId][di]&&data.timetable[classId][di][pi];if(!cell)return'';const subj=data.subjects.find(s=>s.id===cell.subjectId);const teacher=data.teachers.find(t=>t.id===cell.teacherId);const room=cell.roomId?(data.rooms||[]).find(r=>r.id===cell.roomId):null;return(subj?subj.code:'')+(teacher?' ('+teacher.code+')':'')+(room?' ['+room.name+']':'');})]);
+  const ttExpH=['Period',...TB_DAYS.map(d=>d.slice(0,3))];
+  const ttExpR=pList.map((p,pi)=>[p.name+' ('+p.start+'–'+p.end+')',...TB_DAYS.map((_,di)=>{if(isNonTeaching(p))return p.name;const cell=data.timetable[classId]&&data.timetable[classId][di]&&data.timetable[classId][di][pi];if(!cell)return'';const subj=data.subjects.find(s=>s.id===cell.subjectId);const teacher=data.teachers.find(t=>t.id===cell.teacherId);const room=cell.roomId?(data.rooms||[]).find(r=>r.id===cell.roomId):null;return(subj?subj.code:'')+(teacher?' ('+teacher.code+')':'')+(room?' ['+room.name+']':'');})]);
   const totalTeachMin=pList.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
   const totalDayMin=pList.reduce((s,p)=>s+(p.duration||0),0);
   const conflictCount=Object.keys(conflicts).filter(k=>k.startsWith(classId+'|')).length;
   return(<div>
-    <div className="pagehead"><div><h1 className="serif"><em>Timetable</em> Builder</h1><div className="sub">Red dot = teacher conflict. Yellow dot = room conflict. Auto-fill is conflict-aware.</div></div><div className="actions">
+    <div className="pagehead"><div><h1 className="serif"><em>Timetable</em> Builder</h1><div className="sub">Independent of Day Structure: uses Mon–Sat and the locally-picked session. Red dot = teacher conflict. Yellow dot = room conflict. Auto-fill is conflict-aware.</div></div><div className="actions">
       <ExportBar title={'Timetable – '+(cls?cls.name:'')} headers={ttExpH} rows={ttExpR} subtitle={cls?cls.name:''}/>
       <button className="btn btn-ghost" onClick={autoFill}>Auto-fill</button><button className="btn btn-danger" onClick={clearClass}>Clear</button></div></div>
 
@@ -1248,26 +1263,27 @@ function TimetablePage({data,update}){
         </div>
         <span style={{fontSize:12,color:'var(--ink-muted)'}}>Teaching: {totalTeachMin} min | Day: {totalDayMin} min ({Math.floor(totalDayMin/60)}h {totalDayMin%60}m)</span>
         {conflictCount>0&&<span className="badge badge-err">{conflictCount} conflicts</span>}
+        <span style={{fontSize:11,color:'var(--ink-muted)',fontStyle:'italic'}}>local view — does not change Day Structure</span>
       </div>
     </div>
 
     <div className="tt-toolbar"><SearchSelect value={classId} options={clsOpts} onChange={setClassId} style={{minWidth:240}}/>
       {cls&&<span className={`badge ${cls.group==='preprimary'?'':cls.group==='primary'?'badge-ok':'badge-warn'}`}>{cls.group==='preprimary'?'PRE-PRIMARY':cls.group==='primary'?'PRIMARY':'UPPER'}</span>}
-      <span style={{color:'var(--ink-muted)',fontSize:12.5}}>{Object.values(data.timetable[classId]||{}).reduce((s,d)=>s+Object.keys(d).length,0)}/{tCount*data.school.days.length} slots</span>
+      <span style={{color:'var(--ink-muted)',fontSize:12.5}}>{Object.values(data.timetable[classId]||{}).reduce((s,d)=>s+Object.keys(d).length,0)}/{tCount*TB_DAYS.length} slots</span>
     </div>
     <div className="tt-toolbar no-print" style={{marginTop:-4}}>
       <span style={{fontSize:11,fontWeight:500,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.1em'}}>View:</span>
       <div className="tab-bar" style={{flexWrap:'wrap'}}>
         <button className={`tab-btn ${showingAll?'active':''}`} onClick={selectAllDays}>All Days</button>
-        {data.school.days.map((d,i)=>(<button key={d} className={`tab-btn ${!showingAll&&dayFilter.includes(i)?'active':''}`} onClick={()=>toggleDay(i)}>{d.slice(0,3)}</button>))}
+        {TB_DAYS.map((d,i)=>(<button key={d} className={`tab-btn ${!showingAll&&dayFilter.includes(i)?'active':''}`} onClick={()=>toggleDay(i)}>{d.slice(0,3)}</button>))}
       </div>
-      <span style={{fontSize:11,color:'var(--ink-muted)'}}>{showingAll?'All '+data.school.days.length+' days':dayFilter.length+' of '+data.school.days.length+' days'}</span>
+      <span style={{fontSize:11,color:'var(--ink-muted)'}}>{showingAll?'All '+TB_DAYS.length+' days':dayFilter.length+' of '+TB_DAYS.length+' days'}</span>
     </div>
     {(()=>{
-      const visibleIndices=showingAll?data.school.days.map((_,i)=>i):dayFilter.slice();
+      const visibleIndices=showingAll?TB_DAYS.map((_,i)=>i):dayFilter.slice();
       return(
     <div className="tt-grid" style={{'--cols':visibleIndices.length}}>
-      <div className="tt-row"><div className="tt-cell header">Period</div>{visibleIndices.map(di=><div key={di} className="tt-cell header">{data.school.days[di]}</div>)}</div>
+      <div className="tt-row"><div className="tt-cell header">Period</div>{visibleIndices.map(di=><div key={di} className="tt-cell header">{TB_DAYS[di]}</div>)}</div>
       {pList.map((p,pi)=>(<div className="tt-row" key={pi}><div className="tt-cell time"><div style={{fontWeight:600,color:'var(--ink-soft)',fontSize:11}}>{p.name}</div><div>{p.start}–{p.end}</div></div>
         {visibleIndices.map(di=>{
           if(p.isBreak)return<div key={di} className="tt-cell break">{p.name}</div>;
@@ -1282,11 +1298,11 @@ function TimetablePage({data,update}){
     </div>
       );
     })()}
-    {picker&&<Picker data={data} classId={classId} picker={picker} pList={pList} onClose={()=>setPicker(null)} onPick={setCell}/>}
+    {picker&&<Picker data={data} dayNames={TB_DAYS} classId={classId} picker={picker} pList={pList} onClose={()=>setPicker(null)} onPick={setCell}/>}
   </div>);
 }
-function Picker({data,classId,picker,pList,onClose,onPick}){
-  const p=pList[picker.p];const day=data.school.days[picker.d];
+function Picker({data,dayNames,classId,picker,pList,onClose,onPick}){
+  const p=pList[picker.p];const day=(dayNames||data.school.days)[picker.d];
   const currentCell=data.timetable[classId]&&data.timetable[classId][picker.d]&&data.timetable[classId][picker.d][picker.p];
   const[selRoom,setSelRoom]=useState(currentCell&&currentCell.roomId?currentCell.roomId:'');
   const roomOpts=[{value:'',label:'-- No Room --'},...(data.rooms||[]).map(r=>({value:r.id,label:r.name}))];
