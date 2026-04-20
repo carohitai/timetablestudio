@@ -1013,28 +1013,70 @@ function AllocatePage({data,update}){
   const bulkAssign=()=>{if(!bulkSubj||!bulkTeacher||!bulkClasses.length)return;const a={...data.allocations};bulkClasses.forEach(cId=>{a[allocKey(cId,bulkSubj)]=bulkTeacher;});update({allocations:a});setBulkClasses([]);};
   const getSubjectsForClass=(cls)=>{const grade=cls.grade||0;return data.subjects.filter(s=>!(s.standards||[]).length||(s.standards||[]).includes(grade));};
 
+  // Teacher-driven filter: once a teacher is picked, show only their qualified subjects
+  // and their assigned classes (both configured in the Faculty tab). When either list
+  // is empty on the profile, fall back to showing all so users aren't locked out.
+  const selectedTeacher=bulkTeacher?data.teachers.find(t=>t.id===bulkTeacher):null;
+  const teacherSubjIds=selectedTeacher&&selectedTeacher.subjects&&selectedTeacher.subjects.length?new Set(selectedTeacher.subjects):null;
+  const teacherClassIds=selectedTeacher&&selectedTeacher.assignedClasses&&selectedTeacher.assignedClasses.length?new Set(selectedTeacher.assignedClasses):null;
+  const teacherSubjChips=selectedTeacher?(selectedTeacher.subjects||[]).map(sId=>data.subjects.find(s=>s.id===sId)).filter(Boolean):[];
+  const teacherClassChips=selectedTeacher?(selectedTeacher.assignedClasses||[]).map(cId=>data.classes.find(c=>c.id===cId)).filter(Boolean):[];
+
+  // Auto-clear stale selections when the teacher changes to someone incompatible
+  useEffect(()=>{
+    if(!selectedTeacher){return;}
+    if(teacherSubjIds&&bulkSubj&&!teacherSubjIds.has(bulkSubj)) setBulkSubj('');
+    if(teacherClassIds) setBulkClasses(a=>a.filter(cId=>teacherClassIds.has(cId)));
+  },[bulkTeacher]);
+
   if(!data.classes.length||!data.teachers.length)return<div><div className="pagehead"><div><h1 className="serif"><em>Allocations</em></h1></div></div><div className="card"><div className="empty-state"><h3>Add classes & teachers first</h3></div></div></div>;
 
   const allSubjIds=[...new Set(data.classes.flatMap(c=>getSubjectsForClass(c).map(s=>s.id)))];
   const visibleSubjects=data.subjects.filter(s=>allSubjIds.includes(s.id));
   const expH=['Class',...visibleSubjects.map(s=>s.code)];
   const expR=data.classes.map(c=>{const applicable=getSubjectsForClass(c);return[c.name,...visibleSubjects.map(s=>{if(!applicable.find(x=>x.id===s.id))return'–';const tId=data.allocations[allocKey(c.id,s.id)];const t=tId?data.teachers.find(x=>x.id===tId):null;return t?t.code:'';})];});
-  const subjOpts=data.subjects.map(s=>({value:s.id,label:s.code+' – '+s.name}));
+  // Subject dropdown: scoped to teacher's qualified subjects when one is picked
+  const subjOpts=data.subjects.filter(s=>!teacherSubjIds||teacherSubjIds.has(s.id)).map(s=>({value:s.id,label:s.code+' – '+s.name}));
   const teacherOpts=data.teachers.map(t=>({value:t.id,label:t.code+' – '+t.name}));
+  // Class chips: teacher's assigned classes ∩ subject-standards filter
+  const eligibleClasses=data.classes.filter(c=>{
+    if(teacherClassIds&&!teacherClassIds.has(c.id))return false;
+    if(!bulkSubj)return true;
+    const subj=data.subjects.find(s=>s.id===bulkSubj);
+    if(!subj)return true;
+    return!(subj.standards||[]).length||(subj.standards||[]).includes(c.grade||0);
+  });
 
   return(<div>
-    <div className="pagehead"><div><h1 className="serif">Subject <em>Allocations</em></h1><div className="sub">Subjects auto-filter by standard. Use bulk assign to allocate one teacher across multiple classes at once.</div></div>
+    <div className="pagehead"><div><h1 className="serif">Subject <em>Allocations</em></h1><div className="sub">Subjects auto-filter by standard. Pick a teacher in Bulk Assign to scope subjects and classes to their Faculty profile.</div></div>
       <ExportBar title="Subject Allocations" headers={expH} rows={expR}/>
     </div>
     <div className="card"><div className="card-title">Bulk Assign</div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
-        <div className="field" style={{margin:0}}><label>Subject</label><SearchSelect value={bulkSubj} options={[{value:'',label:'-- Select Subject --'},...subjOpts]} onChange={setBulkSubj}/></div>
+        <div className="field" style={{margin:0}}><label>Subject</label><SearchSelect value={bulkSubj} options={[{value:'',label:bulkTeacher&&!subjOpts.length?'-- Teacher has no qualified subjects --':'-- Select Subject --'},...subjOpts]} onChange={setBulkSubj}/></div>
         <div className="field" style={{margin:0}}><label>Teacher</label><SearchSelect value={bulkTeacher} options={[{value:'',label:'-- Select Teacher --'},...teacherOpts]} onChange={setBulkTeacher}/></div>
       </div>
+      {selectedTeacher&&(
+        <div style={{padding:'10px 12px',marginBottom:12,borderRadius:6,background:'var(--bg)',border:'1px solid var(--line-soft)',fontSize:12,color:'var(--ink-soft)'}}>
+          <div style={{marginBottom:6}}>
+            <span style={{fontWeight:600,color:'var(--ink)'}}>{selectedTeacher.name}</span>
+            <span className="mono" style={{color:'var(--ink-muted)',marginLeft:6}}>{selectedTeacher.code}</span>
+            <span style={{marginLeft:8}}>{selectedTeacher.designation||'—'}</span>
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,alignItems:'center',marginBottom:4}}>
+            <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--ink-muted)',minWidth:80}}>Subjects:</span>
+            {teacherSubjChips.length?teacherSubjChips.map(s=>(<span key={s.id} className="chip" style={{background:s.color+'22',color:s.color}}><span className="chip-color" style={{background:s.color}}></span>{s.code}</span>)):<span style={{fontStyle:'italic',color:'var(--ink-muted)'}}>none set — all subjects available</span>}
+          </div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:6,alignItems:'center'}}>
+            <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--ink-muted)',minWidth:80}}>Classes:</span>
+            {teacherClassChips.length?teacherClassChips.map(c=>(<span key={c.id} className="chip">{c.name}</span>)):<span style={{fontStyle:'italic',color:'var(--ink-muted)'}}>none set — all classes available</span>}
+          </div>
+        </div>
+      )}
       <div style={{marginBottom:12}}>
         <label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Assign to Classes</label>
         <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
-          {data.classes.filter(c=>{if(!bulkSubj)return true;const subj=data.subjects.find(s=>s.id===bulkSubj);if(!subj)return true;return!(subj.standards||[]).length||(subj.standards||[]).includes(c.grade||0);}).map(c=>(<button key={c.id} onClick={()=>toggleBulkClass(c.id)} className={bulkClasses.includes(c.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{c.name}</button>))}
+          {eligibleClasses.length?eligibleClasses.map(c=>(<button key={c.id} onClick={()=>toggleBulkClass(c.id)} className={bulkClasses.includes(c.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{c.name}</button>)):<span style={{fontSize:12,color:'var(--ink-muted)',fontStyle:'italic'}}>No classes match this teacher and subject combination.</span>}
         </div>
       </div>
       <button className="btn btn-success" onClick={bulkAssign} disabled={!bulkSubj||!bulkTeacher||!bulkClasses.length}>Assign to {bulkClasses.length} class{bulkClasses.length!==1?'es':''}</button>
