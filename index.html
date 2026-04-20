@@ -490,7 +490,9 @@ function migrateData(old){
 
 async function loadData(){
   if(window.__TWS_EMBEDDED_DATA){try{const e=JSON.parse(JSON.stringify(window.__TWS_EMBEDDED_DATA));const m=migrateData(e);await store.set(STORAGE_KEY,JSON.stringify(m));return m;}catch(e){}}
-  try{const r=await store.get(STORAGE_KEY);if(r&&r.value)return JSON.parse(r.value);}catch(e){}
+  // Always run migrations so field additions (e.g. dayCategories/categoryPeriods)
+  // populate for users already on the current storage key.
+  try{const r=await store.get(STORAGE_KEY);if(r&&r.value){const o=migrateData(JSON.parse(r.value));await store.set(STORAGE_KEY,JSON.stringify(o));return o;}}catch(e){}
   for(const k of['tws_timetable_v7','tws_timetable_v6','tws_timetable_v5','tws_timetable_v4','tws_timetable_v3','tws_timetable_v2','tws_timetable_v1']){
     try{const r=await store.get(k);if(r&&r.value){const o=migrateData(JSON.parse(r.value));await store.set(STORAGE_KEY,JSON.stringify(o));return o;}}catch(e){}
   }
@@ -563,17 +565,40 @@ function getPeriodsForClass(school,cls){
   if(cls&&cls.group==='upper') return school.upperPeriods||school.primaryPeriods;
   return school.primaryPeriods;
 }
+// Return the day-category key (weekdays | activity | bagless) for a given day NAME.
+function getCategoryForDay(school,dayName){
+  const dc=(school&&school.dayCategories)||{weekdays:[],activity:[],bagless:[]};
+  if((dc.bagless||[]).includes(dayName))return'bagless';
+  if((dc.activity||[]).includes(dayName))return'activity';
+  if((dc.weekdays||[]).includes(dayName))return'weekdays';
+  return'weekdays';
+}
+// Return the period list that applies to a given class on a given day NAME,
+// taking day-category + group into account. Falls back to the legacy grid
+// if categoryPeriods are missing for that category.
+function getPeriodsForClassDay(school,cls,dayName){
+  if(!cls||!dayName)return getPeriodsForClass(school,cls);
+  const cat=getCategoryForDay(school,dayName);
+  const cp=(school.categoryPeriods||{})[cat];
+  if(!cp)return getPeriodsForClass(school,cls);
+  const key=cls.group==='preprimary'?'preprimaryPeriods':cls.group==='upper'?'upperPeriods':'primaryPeriods';
+  return cp[key]||getPeriodsForClass(school,cls);
+}
 function timeOverlaps(s1,e1,s2,e2){return s1<e2&&e1>s2}
 
 function findConflicts(tt,classes,school){
   const conflicts={};const teacherMap={};const roomMap={};
-  classes.forEach(cls=>{const days=tt[cls.id]||{};const pList=getPeriodsForClass(school,cls);
-    Object.keys(days).forEach(d=>{Object.keys(days[d]||{}).forEach(pi=>{const c=days[d][pi];if(!c)return;const p=pList[Number(pi)];if(!p||isNonTeaching(p))return;
-      // Teacher conflict check
-      if(c.teacherId){const k=`${d}|${p.start}|${p.end}|T|${c.teacherId}`;if(!teacherMap[k])teacherMap[k]=[];teacherMap[k].push(`${cls.id}|${d}|${pi}`);}
-      // Room conflict check
-      if(c.roomId){const rk=`${d}|${p.start}|${p.end}|R|${c.roomId}`;if(!roomMap[rk])roomMap[rk]=[];roomMap[rk].push(`${cls.id}|${d}|${pi}`);}
-    });});});
+  const days=school.days||[];
+  classes.forEach(cls=>{const clsDays=tt[cls.id]||{};
+    Object.keys(clsDays).forEach(d=>{
+      const dayName=days[Number(d)];
+      const pList=getPeriodsForClassDay(school,cls,dayName);
+      Object.keys(clsDays[d]||{}).forEach(pi=>{const c=clsDays[d][pi];if(!c)return;const p=pList[Number(pi)];if(!p||isNonTeaching(p))return;
+        if(c.teacherId){const k=`${d}|${p.start}|${p.end}|T|${c.teacherId}`;if(!teacherMap[k])teacherMap[k]=[];teacherMap[k].push(`${cls.id}|${d}|${pi}`);}
+        if(c.roomId){const rk=`${d}|${p.start}|${p.end}|R|${c.roomId}`;if(!roomMap[rk])roomMap[rk]=[];roomMap[rk].push(`${cls.id}|${d}|${pi}`);}
+      });
+    });
+  });
   Object.values(teacherMap).forEach(arr=>{if(arr.length>1)arr.forEach(k=>{conflicts[k]='teacher';});});
   Object.values(roomMap).forEach(arr=>{if(arr.length>1)arr.forEach(k=>{conflicts[k]=conflicts[k]?'both':'room';});});
   return conflicts;
@@ -581,23 +606,32 @@ function findConflicts(tt,classes,school){
 
 function teacherLoad(teacher,tt,classes,school){
   let total=0;const bySubject={},byClass={},byDay={};
-  school.days.forEach((_,i)=>{byDay[i]=0;});
-  classes.forEach(cls=>{const tbl=tt[cls.id]||{};const pList=getPeriodsForClass(school,cls);
-    Object.keys(tbl).forEach(d=>{Object.keys(tbl[d]||{}).forEach(pi=>{const c=tbl[d][pi];
-      if(c&&c.teacherId===teacher.id){const p=pList[Number(pi)];if(p&&!isNonTeaching(p)){total++;bySubject[c.subjectId]=(bySubject[c.subjectId]||0)+1;byClass[cls.id]=(byClass[cls.id]||0)+1;byDay[d]=(byDay[d]||0)+1;}}});});});
+  const days=school.days||[];
+  days.forEach((_,i)=>{byDay[i]=0;});
+  classes.forEach(cls=>{const tbl=tt[cls.id]||{};
+    Object.keys(tbl).forEach(d=>{
+      const dayName=days[Number(d)];
+      const pList=getPeriodsForClassDay(school,cls,dayName);
+      Object.keys(tbl[d]||{}).forEach(pi=>{const c=tbl[d][pi];
+        if(c&&c.teacherId===teacher.id){const p=pList[Number(pi)];if(p&&!isNonTeaching(p)){total++;bySubject[c.subjectId]=(bySubject[c.subjectId]||0)+1;byClass[cls.id]=(byClass[cls.id]||0)+1;byDay[d]=(byDay[d]||0)+1;}}
+      });
+    });
+  });
   return{total,bySubject,byClass,byDay};
 }
 
 function getTeacherScheduleForDay(teacherId,dayIdx,tt,classes,school){
   const sched=[];
-  classes.forEach(cls=>{const pList=getPeriodsForClass(school,cls);const dayTT=(tt[cls.id]||{})[dayIdx]||{};
+  const dayName=(school.days||[])[Number(dayIdx)];
+  classes.forEach(cls=>{const pList=getPeriodsForClassDay(school,cls,dayName);const dayTT=(tt[cls.id]||{})[dayIdx]||{};
     Object.entries(dayTT).forEach(([pi,cell])=>{if(cell&&cell.teacherId===teacherId){const p=pList[Number(pi)];if(p&&!isNonTeaching(p))sched.push({periodIdx:Number(pi),name:p.name,start:p.start,end:p.end,classId:cls.id,className:cls.name,subjectId:cell.subjectId,group:cls.group});}});});
   return sched.sort((a,b)=>a.start.localeCompare(b.start));
 }
 
 function findFreeTeachers(dayIdx,start,end,tt,classes,school,teachers,excludeIds){
   const busy=new Set(excludeIds||[]);
-  classes.forEach(cls=>{const pList=getPeriodsForClass(school,cls);const dayTT=(tt[cls.id]||{})[dayIdx]||{};
+  const dayName=(school.days||[])[Number(dayIdx)];
+  classes.forEach(cls=>{const pList=getPeriodsForClassDay(school,cls,dayName);const dayTT=(tt[cls.id]||{})[dayIdx]||{};
     Object.entries(dayTT).forEach(([pi,cell])=>{if(!cell||!cell.teacherId)return;const p=pList[Number(pi)];if(!p||isNonTeaching(p))return;
       if(timeOverlaps(p.start,p.end,start,end))busy.add(cell.teacherId);});});
   return teachers.filter(t=>!busy.has(t.id));
@@ -1238,34 +1272,39 @@ function TimetablePage({data,update}){
   const activeSession=data.school.activeSession||'normal';
 
   if(!data.classes.length)return<div><div className="pagehead"><div><h1 className="serif"><em>Timetable</em></h1></div></div><div className="card"><div className="empty-state"><h3>Add classes first</h3></div></div></div>;
-  const cls=data.classes.find(c=>c.id===classId);const pList=cls?getPeriodsForClass(tbSchool,cls):data.school.primaryPeriods;const tCount=getTeachingCount(pList);
+  const cls=data.classes.find(c=>c.id===classId);
+  // Per-day period lookup for the currently-selected class. Each day uses the
+  // period grid of its own day-category (weekdays / activity / bagless).
+  const periodsFor=(dIdx)=>cls?getPeriodsForClassDay(tbSchool,cls,TB_DAYS[dIdx]):data.school.primaryPeriods||[];
+  const tSlotsTotal=TB_DAYS.reduce((s,_,i)=>s+getTeachingCount(periodsFor(i)),0);
   const setCell=(sId,roomId)=>{if(!picker)return;const tId=sId?data.allocations[allocKey(classId,sId)]:null;const tt=JSON.parse(JSON.stringify(data.timetable));if(!tt[classId])tt[classId]={};if(!tt[classId][picker.d])tt[classId][picker.d]={};if(sId)tt[classId][picker.d][picker.p]={subjectId:sId,teacherId:tId||null,roomId:roomId||null};else delete tt[classId][picker.d][picker.p];update({timetable:tt});setPicker(null);};
   const clearClass=()=>{if(!confirm('Clear?'))return;const tt={...data.timetable};delete tt[classId];update({timetable:tt});};
 
-  // Conflict-aware auto-fill: checks if teacher is already busy before placing
+  // Conflict-aware auto-fill: iterates each day using THAT day's category periods
   const autoFill=()=>{
     const al=Object.entries(data.allocations).filter(([k])=>k.startsWith(classId+'|'));
     if(!al.length){alert('No allocations for this class.');return;}
-    const ws=tCount*TB_DAYS.length;
+    const ws=tSlotsTotal;
+    if(!ws){alert('No teaching slots available — check Day Structure period grids.');return;}
     const cnt={};const ps=Math.floor(ws/al.length);
     al.forEach(([k])=>cnt[k.split('|')[1]]=ps);
     let rem=ws-ps*al.length;
     al.forEach(([k])=>{if(rem>0){cnt[k.split('|')[1]]++;rem--;}});
-    // Build pool of {subjectId, teacherId} items
     const pool=[];
     Object.entries(cnt).forEach(([sId,n])=>{
       const tId=data.allocations[allocKey(classId,sId)]||null;
       for(let i=0;i<n;i++) pool.push({subjectId:sId,teacherId:tId});
     });
-    // Shuffle
     for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
-    // Build a busy map: for each (dayIdx, periodStart-End), which teacherIds are occupied
+    // Busy map uses each existing cell's OWN day-category periods for the lookup.
     const busyMap={};
     data.classes.forEach(c=>{
-      if(c.id===classId) return; // skip the class we're filling
-      const cPList=getPeriodsForClass(tbSchool,c);
+      if(c.id===classId) return;
       const cTT=data.timetable[c.id]||{};
       Object.keys(cTT).forEach(dIdx=>{
+        const dayName=TB_DAYS[Number(dIdx)];
+        if(!dayName) return;
+        const cPList=getPeriodsForClassDay(tbSchool,c,dayName);
         Object.keys(cTT[dIdx]||{}).forEach(pIdx=>{
           const cell=cTT[dIdx][pIdx];
           if(!cell||!cell.teacherId) return;
@@ -1277,10 +1316,11 @@ function TimetablePage({data,update}){
         });
       });
     });
-    // Get teaching positions for this class (uses TB_DAYS, not Day Structure days)
+    // Teaching positions for THIS class — per day, using that day's category grid.
     const positions=[];
-    TB_DAYS.forEach((_,dIdx)=>{
-      pList.forEach((p,pIdx)=>{if(!isNonTeaching(p)) positions.push({dIdx,pIdx,start:p.start,end:p.end});});
+    TB_DAYS.forEach((dayName,dIdx)=>{
+      const dayPeriods=getPeriodsForClassDay(tbSchool,cls,dayName);
+      dayPeriods.forEach((p,pIdx)=>{if(!isNonTeaching(p)) positions.push({dIdx,pIdx,start:p.start,end:p.end});});
     });
     const tt=JSON.parse(JSON.stringify(data.timetable));
     if(!tt[classId]) tt[classId]={};
@@ -1360,13 +1400,37 @@ function TimetablePage({data,update}){
   };
 
   const clsOpts=data.classes.map(c=>({value:c.id,label:c.name+' ('+(c.group==='preprimary'?'Pre-Pri':c.group==='upper'?'Upper':'Primary')+')'}));
-  const ttExpH=['Period',...TB_DAYS.map(d=>d.slice(0,3))];
-  const ttExpR=pList.map((p,pi)=>[p.name+' ('+p.start+'–'+p.end+')',...TB_DAYS.map((_,di)=>{if(isNonTeaching(p))return p.name;const cell=data.timetable[classId]&&data.timetable[classId][di]&&data.timetable[classId][di][pi];if(!cell)return'';const subj=data.subjects.find(s=>s.id===cell.subjectId);const teacher=data.teachers.find(t=>t.id===cell.teacherId);const room=cell.roomId?(data.rooms||[]).find(r=>r.id===cell.roomId):null;return(subj?subj.code:'')+(teacher?' ('+teacher.code+')':'')+(room?' ['+room.name+']':'');})]);
-  const totalTeachMin=pList.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
-  const totalDayMin=pList.reduce((s,p)=>s+(p.duration||0),0);
+  // Export flattens across categories — one table row per (category, period) combination.
+  const visibleIndices=showingAll?TB_DAYS.map((_,i)=>i):dayFilter.slice();
+  const catDaysInView={};
+  visibleIndices.forEach(di=>{const dayName=TB_DAYS[di];const cat=getCategoryForDay(tbSchool,dayName);if(!catDaysInView[cat])catDaysInView[cat]={dayIdxs:[],periods:cls?getPeriodsForClassDay(tbSchool,cls,dayName):[]};catDaysInView[cat].dayIdxs.push(di);});
+  const CAT_ORDER=['weekdays','activity','bagless'];
+  const orderedCats=CAT_ORDER.filter(c=>catDaysInView[c]);
+  const ttExpH=['Category','Period',...TB_DAYS.map(d=>d.slice(0,3))];
+  const ttExpR=[];
+  orderedCats.forEach(cat=>{
+    const{dayIdxs,periods}=catDaysInView[cat];
+    periods.forEach((p,pi)=>{
+      const row=[DAY_CATEGORY_LABELS[cat]||cat,p.name+' ('+p.start+'–'+p.end+')'];
+      TB_DAYS.forEach((dName,di)=>{
+        if(!dayIdxs.includes(di)){row.push('—');return;}
+        if(isNonTeaching(p)){row.push(p.name);return;}
+        const cell=data.timetable[classId]&&data.timetable[classId][di]&&data.timetable[classId][di][pi];
+        if(!cell){row.push('');return;}
+        const subj=data.subjects.find(s=>s.id===cell.subjectId);
+        const teacher=data.teachers.find(t=>t.id===cell.teacherId);
+        const room=cell.roomId?(data.rooms||[]).find(r=>r.id===cell.roomId):null;
+        row.push((subj?subj.code:'')+(teacher?' ('+teacher.code+')':'')+(room?' ['+room.name+']':''));
+      });
+      ttExpR.push(row);
+    });
+  });
+  // Weighted sums across each day's category periods
+  const totalTeachMin=TB_DAYS.reduce((s,_,i)=>{const pr=periodsFor(i);return s+pr.filter(p=>!isNonTeaching(p)).reduce((a,p)=>a+(p.duration||0),0);},0);
+  const totalDayMin=TB_DAYS.reduce((s,_,i)=>{const pr=periodsFor(i);return s+pr.reduce((a,p)=>a+(p.duration||0),0);},0);
   const conflictCount=Object.keys(conflicts).filter(k=>k.startsWith(classId+'|')).length;
   return(<div>
-    <div className="pagehead"><div><h1 className="serif"><em>Timetable</em> Builder</h1><div className="sub">Always Mon–Sat. Per-standard period arrangement follows Day Structure. Red dot = teacher conflict. Yellow dot = room conflict. Auto-fill is conflict-aware.</div></div><div className="actions">
+    <div className="pagehead"><div><h1 className="serif"><em>Timetable</em> Builder</h1><div className="sub">Always Mon–Sat, rendered as per-category blocks. Weekdays / Activity / Bag Less each use their own period grid from Day Structure. Red dot = teacher conflict. Yellow dot = room conflict.</div></div><div className="actions">
       <ExportBar title={'Timetable – '+(cls?cls.name:'')} headers={ttExpH} rows={ttExpR} subtitle={cls?cls.name:''}/>
       <button className="btn btn-ghost" onClick={autoFill}>Auto-fill</button><button className="btn btn-danger" onClick={clearClass}>Clear</button></div></div>
 
@@ -1376,14 +1440,14 @@ function TimetablePage({data,update}){
         <div className="tab-bar">
           {Object.entries(SESSION_PRESETS).map(([k,pr])=>(<button key={k} className={`tab-btn ${activeSession===k?'active':''}`} onClick={()=>switchSession(k)}>{pr.label}</button>))}
         </div>
-        <span style={{fontSize:12,color:'var(--ink-muted)'}}>Teaching: {totalTeachMin} min | Day: {totalDayMin} min ({Math.floor(totalDayMin/60)}h {totalDayMin%60}m)</span>
+        <span style={{fontSize:12,color:'var(--ink-muted)'}}>Teaching: {totalTeachMin} min / week | Day: {totalDayMin} min ({Math.floor(totalDayMin/60)}h {totalDayMin%60}m)</span>
         {conflictCount>0&&<span className="badge badge-err">{conflictCount} conflicts</span>}
       </div>
     </div>
 
     <div className="tt-toolbar"><SearchSelect value={classId} options={clsOpts} onChange={setClassId} style={{minWidth:240}}/>
       {cls&&<span className={`badge ${cls.group==='preprimary'?'':cls.group==='primary'?'badge-ok':'badge-warn'}`}>{cls.group==='preprimary'?'PRE-PRIMARY':cls.group==='primary'?'PRIMARY':'UPPER'}</span>}
-      <span style={{color:'var(--ink-muted)',fontSize:12.5}}>{Object.values(data.timetable[classId]||{}).reduce((s,d)=>s+Object.keys(d).length,0)}/{tCount*TB_DAYS.length} slots</span>
+      <span style={{color:'var(--ink-muted)',fontSize:12.5}}>{Object.values(data.timetable[classId]||{}).reduce((s,d)=>s+Object.keys(d).length,0)}/{tSlotsTotal} slots</span>
     </div>
     <div className="tt-toolbar no-print" style={{marginTop:-4}}>
       <span style={{fontSize:11,fontWeight:500,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.1em'}}>View:</span>
@@ -1393,26 +1457,34 @@ function TimetablePage({data,update}){
       </div>
       <span style={{fontSize:11,color:'var(--ink-muted)'}}>{showingAll?'All '+TB_DAYS.length+' days':dayFilter.length+' of '+TB_DAYS.length+' days'}</span>
     </div>
-    {(()=>{
-      const visibleIndices=showingAll?TB_DAYS.map((_,i)=>i):dayFilter.slice();
-      return(
-    <div className="tt-grid" style={{'--cols':visibleIndices.length}}>
-      <div className="tt-row"><div className="tt-cell header">Period</div>{visibleIndices.map(di=><div key={di} className="tt-cell header">{TB_DAYS[di]}</div>)}</div>
-      {pList.map((p,pi)=>(<div className="tt-row" key={pi}><div className="tt-cell time"><div style={{fontWeight:600,color:'var(--ink-soft)',fontSize:11}}>{p.name}</div><div>{p.start}–{p.end}</div></div>
-        {visibleIndices.map(di=>{
-          if(p.isBreak)return<div key={di} className="tt-cell break">{p.name}</div>;
-          if(p.isAssembly)return<div key={di} className="tt-cell assembly">{p.name}</div>;
-          if(p.isOrientation)return<div key={di} className="tt-cell orientation">{p.name}</div>;
-          const cell=data.timetable[classId]&&data.timetable[classId][di]&&data.timetable[classId][di][pi];
-          const subj=cell?data.subjects.find(s=>s.id===cell.subjectId):null;const teacher=cell?data.teachers.find(t=>t.id===cell.teacherId):null;
-          const conType=conflicts[`${classId}|${di}|${pi}`];
-          const conClass=conType==='teacher'||conType==='both'?'conflict':conType==='room'?'room-conflict':'';
-          return<div key={di} className={`tt-cell ${!cell?'empty':''} ${conClass}`} style={subj?{background:subj.color+'10',borderLeft:`3px solid ${subj.color}`}:{}} onClick={()=>setPicker({d:di,p:pi})}>{cell&&subj?(<><div className="subj"><span className="chip-color" style={{background:subj.color}}></span>{subj.code}</div><div className="teach">{teacher?teacher.code:'--'}</div></>):'+ assign'}</div>;
-        })}</div>))}
-    </div>
-      );
-    })()}
-    {picker&&<Picker data={data} dayNames={TB_DAYS} classId={classId} picker={picker} pList={pList} onClose={()=>setPicker(null)} onPick={setCell}/>}
+    {orderedCats.length===0&&<div className="card"><div className="empty-state"><h3 className="serif">No days visible</h3><p>Toggle a day above to see its grid.</p></div></div>}
+    {orderedCats.map(cat=>{
+      const{dayIdxs,periods}=catDaysInView[cat];
+      const catLabel=DAY_CATEGORY_LABELS[cat]||cat;
+      const catColor=cat==='weekdays'?'var(--accent)':cat==='activity'?'var(--warm)':'var(--ink-soft)';
+      return(<div key={cat} style={{marginBottom:18}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,margin:'4px 2px 8px'}}>
+          <span style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',color:catColor}}>{catLabel}</span>
+          <span style={{fontSize:11.5,color:'var(--ink-muted)'}}>{dayIdxs.map(i=>TB_DAYS[i].slice(0,3)).join(' · ')} · {getTeachingCount(periods)} teaching periods</span>
+        </div>
+        {!periods.length?<div style={{padding:14,border:'1px dashed var(--line)',borderRadius:8,color:'var(--ink-muted)',fontSize:12.5,fontStyle:'italic'}}>No period grid configured for {catLabel}. Go to Day Structure → {catLabel} → {cls?(cls.group==='preprimary'?'Pre-Primary':cls.group==='upper'?'Upper':'Primary'):'the class group'} and add periods.</div>:
+        <div className="tt-grid" style={{'--cols':dayIdxs.length}}>
+          <div className="tt-row"><div className="tt-cell header">Period</div>{dayIdxs.map(di=><div key={di} className="tt-cell header">{TB_DAYS[di]}</div>)}</div>
+          {periods.map((p,pi)=>(<div className="tt-row" key={pi}><div className="tt-cell time"><div style={{fontWeight:600,color:'var(--ink-soft)',fontSize:11}}>{p.name}</div><div>{p.start}–{p.end}</div></div>
+            {dayIdxs.map(di=>{
+              if(p.isBreak)return<div key={di} className="tt-cell break">{p.name}</div>;
+              if(p.isAssembly)return<div key={di} className="tt-cell assembly">{p.name}</div>;
+              if(p.isOrientation)return<div key={di} className="tt-cell orientation">{p.name}</div>;
+              const cell=data.timetable[classId]&&data.timetable[classId][di]&&data.timetable[classId][di][pi];
+              const subj=cell?data.subjects.find(s=>s.id===cell.subjectId):null;const teacher=cell?data.teachers.find(t=>t.id===cell.teacherId):null;
+              const conType=conflicts[`${classId}|${di}|${pi}`];
+              const conClass=conType==='teacher'||conType==='both'?'conflict':conType==='room'?'room-conflict':'';
+              return<div key={di} className={`tt-cell ${!cell?'empty':''} ${conClass}`} style={subj?{background:subj.color+'10',borderLeft:`3px solid ${subj.color}`}:{}} onClick={()=>setPicker({d:di,p:pi})}>{cell&&subj?(<><div className="subj"><span className="chip-color" style={{background:subj.color}}></span>{subj.code}</div><div className="teach">{teacher?teacher.code:'--'}</div></>):'+ assign'}</div>;
+            })}</div>))}
+        </div>}
+      </div>);
+    })}
+    {picker&&<Picker data={data} dayNames={TB_DAYS} classId={classId} picker={picker} pList={periodsFor(picker.d)} onClose={()=>setPicker(null)} onPick={setCell}/>}
   </div>);
 }
 function Picker({data,dayNames,classId,picker,pList,onClose,onPick}){
