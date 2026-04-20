@@ -286,32 +286,32 @@ const LECTURE_LIMITS = {
 const mkTeacher = (id,name,code,desig,status,max,subjs) => ({id,name,code,designation:desig,status,maxPeriods:max,subjects:subjs,qualifications:[],otherCourses:'',photo:'',assignedClasses:[],teacherType:'regular',availFrom:'',availTo:''});
 const DEFAULT_TEACHERS = [
   mkTeacher('t01','Ms. Patricia C. Hassett','PCH','Principal','OLD',10,[]),
-  mkTeacher('t02','Ms. Jennifer V. Sonawane','JVS','Supervisor','OLD',30,[]),
-  mkTeacher('t03','Mr. Devendra S. Bharambe','DSB','Librarian','OLD',30,['s12']),
-  mkTeacher('t04','Ms. Rajshree A. Awtade','RAA','Asst. Teacher','OLD',35,[]),
-  mkTeacher('t05','Mr. Sumit D. Dasgupta','SDD','Sport Teacher','OLD',35,['s10']),
-  mkTeacher('t06','Ms. Priyanka T. Bhole','PTB','Asst. Teacher','OLD',35,[]),
-  mkTeacher('t07','Ms. Bharati D. Patrick','BDP','Supervisor','OLD',30,[]),
-  mkTeacher('t08','Ms. Yamini N. Warulkar','YNW','Supervisor','OLD',30,[]),
-  mkTeacher('t09','Ms. Jyoti A. Rathod','JAR','Asst. Teacher','OLD',35,[]),
-  mkTeacher('t10','Ms. Laxmi V. Tayade','LVT','Asst. Teacher','OLD',35,[]),
-  mkTeacher('t11','Ms. Sharda R. Saini','SRS','Asst. Teacher','OLD',35,[]),
-  mkTeacher('t12','Ms. Manda S. Talele','MST','Asst. Teacher','OLD',35,[]),
-  mkTeacher('t13','Ms. Ravina R. Ubale','RRU','Asst. Teacher','OLD',35,[]),
-  mkTeacher('t14','Ms. Payal Shukla','PSH','Asst. Teacher','OLD',35,[]),
-  mkTeacher('t15','Ms. Sudha K. Bansode','SKB','Asst. Teacher','OLD',35,[]),
-  mkTeacher('t16','Ms. Priti M. Myakal','PMM','Asst. Teacher','OLD',35,[]),
-  mkTeacher('t17','Ms. Vinita S. Shrivas','VSS','Asst. Teacher','NEW',35,[]),
-  mkTeacher('t18','Ms. Sunita V. Khillare','SVK','Asst. Teacher','NEW',35,[]),
-  mkTeacher('t19','Ms. Deepali P. Wani','DPW','Asst. Teacher','NEW',35,[]),
-  mkTeacher('t20','Ms. Nisha S. Boralkar','NSB','Asst. Teacher','NEW',35,[]),
-  mkTeacher('t21','Ms. Neha Pardeshi','NPA','Asst. Teacher','NEW',35,[]),
-  mkTeacher('t22','Mr. Rajesh R. Surwade','RRS','Asst. Teacher','NEW',35,[]),
-  mkTeacher('t23','Mr. Pravin M. Mehere','PME','Asst. Teacher','NEW',35,[]),
-  mkTeacher('t24','Ms. Shireen A. Khan','SAK','Asst. Teacher','NEW',35,[]),
-  mkTeacher('t25','Ms. Kavita N. Dhangar','KND','Asst. Teacher','NEW',35,[]),
-  mkTeacher('t26','Mr. Devanand A. Joshi','DAJ','Asst. Teacher','NEW',35,[]),
-  mkTeacher('t27','Mr. Shaikh Muzakkir S. Farid','SMF','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t02','Ms. Jennifer V. Sonawane','JVS','Supervisor','OLD',42,[]),
+  mkTeacher('t03','Mr. Devendra S. Bharambe','DSB','Librarian','OLD',42,['s12']),
+  mkTeacher('t04','Ms. Rajshree A. Awtade','RAA','Asst. Teacher','OLD',42,[]),
+  mkTeacher('t05','Mr. Sumit D. Dasgupta','SDD','Sport Teacher','OLD',42,['s10']),
+  mkTeacher('t06','Ms. Priyanka T. Bhole','PTB','Asst. Teacher','OLD',42,[]),
+  mkTeacher('t07','Ms. Bharati D. Patrick','BDP','Supervisor','OLD',42,[]),
+  mkTeacher('t08','Ms. Yamini N. Warulkar','YNW','Supervisor','OLD',42,[]),
+  mkTeacher('t09','Ms. Jyoti A. Rathod','JAR','Asst. Teacher','OLD',42,[]),
+  mkTeacher('t10','Ms. Laxmi V. Tayade','LVT','Asst. Teacher','OLD',42,[]),
+  mkTeacher('t11','Ms. Sharda R. Saini','SRS','Asst. Teacher','OLD',42,[]),
+  mkTeacher('t12','Ms. Manda S. Talele','MST','Asst. Teacher','OLD',42,[]),
+  mkTeacher('t13','Ms. Ravina R. Ubale','RRU','Asst. Teacher','OLD',42,[]),
+  mkTeacher('t14','Ms. Payal Shukla','PSH','Asst. Teacher','OLD',42,[]),
+  mkTeacher('t15','Ms. Sudha K. Bansode','SKB','Asst. Teacher','OLD',42,[]),
+  mkTeacher('t16','Ms. Priti M. Myakal','PMM','Asst. Teacher','OLD',42,[]),
+  mkTeacher('t17','Ms. Vinita S. Shrivas','VSS','Asst. Teacher','NEW',42,[]),
+  mkTeacher('t18','Ms. Sunita V. Khillare','SVK','Asst. Teacher','NEW',42,[]),
+  mkTeacher('t19','Ms. Deepali P. Wani','DPW','Asst. Teacher','NEW',42,[]),
+  mkTeacher('t20','Ms. Nisha S. Boralkar','NSB','Asst. Teacher','NEW',42,[]),
+  mkTeacher('t21','Ms. Neha Pardeshi','NPA','Asst. Teacher','NEW',42,[]),
+  mkTeacher('t22','Mr. Rajesh R. Surwade','RRS','Asst. Teacher','NEW',42,[]),
+  mkTeacher('t23','Mr. Pravin M. Mehere','PME','Asst. Teacher','NEW',42,[]),
+  mkTeacher('t24','Ms. Shireen A. Khan','SAK','Asst. Teacher','NEW',42,[]),
+  mkTeacher('t25','Ms. Kavita N. Dhangar','KND','Asst. Teacher','NEW',42,[]),
+  mkTeacher('t26','Mr. Devanand A. Joshi','DAJ','Asst. Teacher','NEW',42,[]),
+  mkTeacher('t27','Mr. Shaikh Muzakkir S. Farid','SMF','Asst. Teacher','NEW',42,[]),
 ];
 
 const DEFAULT_CLASSES = [
@@ -431,6 +431,16 @@ function migrateData(old){
   if(!old.qualMaster) old.qualMaster=DEFAULT_QUAL_MASTER.map(q=>({...q}));
   if(!old.rooms) old.rooms=[{id:'r1',name:'Classroom 1'},{id:'r2',name:'Classroom 2'},{id:'r3',name:'Computer Lab'},{id:'r4',name:'Library'},{id:'r5',name:'Playground'}];
   if(old.teachers) old.teachers=migrateTeachers(old.teachers, old.qualMaster);
+  // One-time bump: cap all non-principals at 42 periods/week. Runs once per install
+  // (_v42caps flag) so manually-lowered values aren't clobbered on later loads.
+  if(!old._v42caps&&old.teachers){
+    old.teachers=old.teachers.map(t=>{
+      if(t.designation==='Principal') return t;
+      if(!t.maxPeriods||t.maxPeriods<42) return{...t,maxPeriods:42};
+      return t;
+    });
+    old._v42caps=true;
+  }
   if(old.teachers) old.teachers=old.teachers.map(t=>({teacherType:'regular',availFrom:'',availTo:'',...t}));
   if(!old.proxyAssignments) old.proxyAssignments={};
   if(!old.lectureLimits) old.lectureLimits=LECTURE_LIMITS;
@@ -589,7 +599,7 @@ function App(){
   useEffect(()=>{try{localStorage.setItem('tws_sidebar_collapsed',sidebarCollapsed?'1':'0')}catch(e){}},[sidebarCollapsed]);
   if(loading||!data)return<div style={{padding:40,color:'#8a8f88'}}>Loading…</div>;
   const update=patch=>setData(d=>({...d,...patch}));
-  const tabs=[{id:'dashboard',num:'01',name:'Overview'},{id:'school',num:'02',name:'Day Structure'},{id:'classes',num:'03',name:'Classes'},{id:'qualmaster',num:'04',name:'Qual. Master'},{id:'teachers',num:'05',name:'Faculty'},{id:'subjects',num:'06',name:'Subjects'},{id:'allocate',num:'07',name:'Allocations'},{id:'timetable',num:'08',name:'Timetable'},{id:'load',num:'09',name:'Teacher Load'},{id:'proxy',num:'10',name:'Proxy Mgmt'}];
+  const tabs=[{id:'dashboard',num:'01',name:'Overview'},{id:'school',num:'02',name:'Day Structure'},{id:'classes',num:'03',name:'Classes'},{id:'qualmaster',num:'04',name:'Qual. Master'},{id:'teachers',num:'05',name:'Faculty'},{id:'subjects',num:'06',name:'Subjects'},{id:'allocate',num:'07',name:'Allocations'},{id:'timetable',num:'08',name:'Timetable'},{id:'load',num:'09',name:'Teacher Load'},{id:'proxy',num:'10',name:'Proxy Mgmt'},{id:'rules',num:'11',name:'Rules'}];
   return(
     <div className="app">
       <aside className={`sidebar ${sidebarCollapsed?'collapsed':''}`}>
@@ -615,6 +625,7 @@ function App(){
         {tab==='timetable'&&<TimetablePage data={data} update={update}/>}
         {tab==='load'&&<LoadPage data={data}/>}
         {tab==='proxy'&&<ProxyPage data={data} update={update}/>}
+        {tab==='rules'&&<RulesPage data={data}/>}
       </main>
     </div>
   );
@@ -663,6 +674,7 @@ function SchoolSetup({data,update}){
   const updP=(i,k,v)=>setEdited(p=>{const n=[...p];n[i]={...n[i],[k]:v};if(k==='duration')return calcTimes(startTime,n);return n;});
   const addP=()=>setEdited(p=>calcTimes(startTime,[...p,{name:'New',duration:35}]));
   const remP=i=>setEdited(p=>calcTimes(startTime,p.filter((_,idx)=>idx!==i)));
+  const moveP=(i,dir)=>setEdited(p=>{const j=i+dir;if(j<0||j>=p.length)return p;const n=[...p];[n[i],n[j]]=[n[j],n[i]];return calcTimes(startTime,n);});
   const cycleType=i=>setEdited(p=>{const n=[...p];const c=n[i];if(!c.isBreak&&!c.isAssembly&&!c.isOrientation)n[i]={...c,isBreak:true,isAssembly:false,isOrientation:false};else if(c.isBreak)n[i]={...c,isBreak:false,isAssembly:true,isOrientation:false};else if(c.isAssembly)n[i]={...c,isBreak:false,isAssembly:false,isOrientation:true};else n[i]={...c,isBreak:false,isAssembly:false,isOrientation:false};return n;});
   const tLabel=p=>p.isBreak?'Recess':p.isAssembly?'Assembly':p.isOrientation?'Orientation':'Teaching';
   const tStyle=p=>p.isBreak?{background:'var(--danger-soft)',color:'var(--danger)'}:p.isAssembly?{background:'rgba(13,79,60,0.1)',color:'var(--accent)'}:p.isOrientation?{background:'rgba(184,101,31,0.1)',color:'var(--warm)'}:{};
@@ -690,8 +702,8 @@ function SchoolSetup({data,update}){
         <div style={{display:'flex',alignItems:'center',gap:8}}><label style={{fontSize:12,fontWeight:500,color:'var(--ink-soft)'}}>Start Time:</label><input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} style={{padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontWeight:600}}/></div>
         <span style={{fontSize:12,color:'var(--ink-muted)'}}>{getTeachingCount(edited)} teaching periods | Teaching: {totalTeaching} min | Total day: {totalDay} min ({Math.floor(totalDay/60)}h {totalDay%60}m)</span>
       </div>
-      <table><thead><tr><th>#</th><th>Label</th><th>Duration</th><th>Start</th><th>End</th><th>Type</th><th></th></tr></thead><tbody>
-        {edited.map((p,i)=>(<tr key={i}><td className="mono" style={{color:'var(--ink-muted)'}}>{String(i+1).padStart(2,'0')}</td><td><input value={p.name} onChange={e=>updP(i,'name',e.target.value)} style={{width:140,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><input type="number" value={p.duration||30} onChange={e=>updP(i,'duration',Number(e.target.value)||1)} style={{width:70,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,textAlign:'center'}} min={1}/></td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.start||''}</td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.end||''}</td><td><button className="btn btn-ghost btn-sm" style={tStyle(p)} onClick={()=>cycleType(i)}>{tLabel(p)}</button></td><td style={{textAlign:'right'}}><button className="btn btn-icon btn-danger" onClick={()=>remP(i)}>x</button></td></tr>))}
+      <table><thead><tr><th>#</th><th>Label</th><th>Duration</th><th>Start</th><th>End</th><th>Type</th><th style={{textAlign:'center'}}>Order</th><th></th></tr></thead><tbody>
+        {edited.map((p,i)=>(<tr key={i}><td className="mono" style={{color:'var(--ink-muted)'}}>{String(i+1).padStart(2,'0')}</td><td><input value={p.name} onChange={e=>updP(i,'name',e.target.value)} style={{width:140,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><input type="number" value={p.duration||30} onChange={e=>updP(i,'duration',Number(e.target.value)||1)} style={{width:70,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,textAlign:'center'}} min={1}/></td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.start||''}</td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.end||''}</td><td><button className="btn btn-ghost btn-sm" style={tStyle(p)} onClick={()=>cycleType(i)}>{tLabel(p)}</button></td><td style={{whiteSpace:'nowrap',textAlign:'center'}}><button className="btn btn-icon" disabled={i===0} onClick={()=>moveP(i,-1)} title="Move up" style={{opacity:i===0?0.3:1}}>▲</button><button className="btn btn-icon" disabled={i===edited.length-1} onClick={()=>moveP(i,1)} title="Move down" style={{opacity:i===edited.length-1?0.3:1}}>▼</button></td><td style={{textAlign:'right'}}><button className="btn btn-icon btn-danger" onClick={()=>remP(i)}>x</button></td></tr>))}
       </tbody></table>
     </div>
   </div>);
@@ -847,7 +859,7 @@ function TeachersPage({data,update}){
   const autoSubjects=(qualIds)=>{if(!draft)return;let mapped=[];(qualIds||[]).forEach(qId=>{const q=qm.find(x=>x.id===qId);if(q&&q.subjectMap)mapped=[...mapped,...q.subjectMap];});if(mapped.length){const merged=[...new Set([...(draft.subjects||[]),...mapped])];setDraft(d=>({...d,subjects:merged}));}};
   const toggleDraftQual=qId=>setDraft(d=>{const arr=d.qualifications||[];const nArr=arr.includes(qId)?arr.filter(x=>x!==qId):[...arr,qId];autoSubjects(nArr);return{...d,qualifications:nArr};});
   const getQualNames=(t)=>(t.qualifications||[]).map(qId=>{const q=qm.find(x=>x.id===qId);return q?q.name:''}).filter(Boolean).join(', ');
-  const quickAdd=()=>{if(!addName.trim())return;update({teachers:[...data.teachers,{...mkTeacher(uid(),addName.trim(),addCode.trim()||addName.split(' ').map(w=>w[0]).join('').toUpperCase(),'Asst. Teacher','NEW',35,[])}]});setAddName('');setAddCode('');};
+  const quickAdd=()=>{if(!addName.trim())return;update({teachers:[...data.teachers,{...mkTeacher(uid(),addName.trim(),addCode.trim()||addName.split(' ').map(w=>w[0]).join('').toUpperCase(),'Asst. Teacher','NEW',42,[])}]});setAddName('');setAddCode('');};
 
   const iStyle={padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontSize:12.5};
   const desOpts=DESIG_OPTIONS.map(d=>({value:d,label:d}));
@@ -1438,6 +1450,59 @@ function ProxyPage({data,update}){
         </tbody></table>
       </div>
     )}
+  </div>);
+}
+
+// ===== Rules & Limitations =====
+function RulesPage({data}){
+  const Principal=(data.teachers||[]).find(t=>t.designation==='Principal');
+  const nonPrincipals=(data.teachers||[]).filter(t=>t.designation!=='Principal');
+  const maxValues=[...new Set(nonPrincipals.map(t=>t.maxPeriods))].sort((a,b)=>a-b);
+  const Rule=({n,title,children})=>(
+    <div style={{display:'flex',gap:14,padding:'18px 0',borderBottom:'1px solid var(--line-soft)'}}>
+      <div style={{flex:'0 0 40px',fontFamily:"'Instrument Serif',serif",fontSize:28,lineHeight:1,color:'var(--accent)'}}>{n}</div>
+      <div style={{flex:1}}>
+        <div style={{fontWeight:600,fontSize:14,marginBottom:4}}>{title}</div>
+        <div style={{fontSize:13,color:'var(--ink-soft)',lineHeight:1.6}}>{children}</div>
+      </div>
+    </div>
+  );
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif">Allocation <em>Rules</em></h1><div className="sub">Exactly what Timetable Studio enforces when you click Auto-fill, plus the limits the live timetable watches for.</div></div></div>
+    <div className="card">
+      <div className="card-title">Subject placement rules (auto-fill)</div>
+      <Rule n="01" title="Allocations drive the pool">Only subjects that appear in the <strong>Allocations</strong> tab for a class are eligible to be placed in that class's timetable. If a subject has no allocated teacher, the solver still places the subject in an empty slot but flags the cell as <em>unallocated</em>.</Rule>
+      <Rule n="02" title="Balanced subject quota">Each subject's weekly count is <code>floor(totalTeachingSlots / numSubjects)</code>. Any remainder is distributed one-per-subject from the top of the allocation list so no subject sits idle.</Rule>
+      <Rule n="03" title="No teacher double-booking">Before placing a cell, the solver checks every other class's timetable at the exact same day + start + end. If the teacher is already teaching elsewhere, that subject is skipped for the slot.</Rule>
+      <Rule n="04" title="Teacher max periods per week">The hard ceiling is <strong>{nonPrincipals.length?maxValues.join(' / '):42}</strong> periods for non-principal staff and {Principal?Principal.maxPeriods:10} for the Principal. Auto-fill stops placing a teacher once this cap is reached for the week, across every class.</Rule>
+      <Rule n="05" title="First period of each day">Priority order: (a) the class's <strong>Default First Subject</strong> from the Classes tab, (b) a subject taught by the <strong>Class Teacher</strong>, (c) the next available item from the shuffled pool. The Default First Subject is filtered by the class teacher's qualified subjects.</Rule>
+      <Rule n="06" title="Lecture-based availability window">Teachers with <code>teacherType = 'lecture_based'</code> and an <code>availFrom / availTo</code> window are only considered for slots that fit inside that window — useful for visiting or part-time faculty.</Rule>
+      <Rule n="07" title="Fallback placement">If no eligible teacher is free for a slot, the solver still places the subject in that slot but leaves <code>teacherId</code> null. After the run it alerts how many slots were placed without a teacher so you can fix them manually.</Rule>
+    </div>
+    <div className="card">
+      <div className="card-title">Live conflict checks (Timetable Builder)</div>
+      <Rule n="08" title="Teacher clash (red dot)">Two classes assigning the same teacher to overlapping time ranges on the same day get flagged with a red dot. Auto-fill prevents this; it can still appear from manual edits.</Rule>
+      <Rule n="09" title="Room clash (yellow dot)">Two classes assigning the same room to overlapping time ranges on the same day get a yellow dot. Same detection logic as teacher clashes.</Rule>
+      <Rule n="10" title="Day-structure validation">The Day Structure editor warns on rows where <code>start ≥ end</code> or where two periods overlap. Save these at your own risk — downstream conflict detection relies on clean period times.</Rule>
+    </div>
+    <div className="card">
+      <div className="card-title">Limits & capacities (live data)</div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))',gap:12}}>
+        <div className="stat"><div className="label">Non-principal max/wk</div><div className="val">{nonPrincipals.length?maxValues.slice(-1)[0]:42}</div><div className="delta">periods per teacher per week</div></div>
+        <div className="stat"><div className="label">Principal max/wk</div><div className="val">{Principal?Principal.maxPeriods:'—'}</div><div className="delta">periods per week</div></div>
+        <div className="stat"><div className="label">Working days</div><div className="val">{data.school.days.length}</div><div className="delta">{data.school.days.join(', ')}</div></div>
+        <div className="stat"><div className="label">Teachers</div><div className="val">{(data.teachers||[]).length}</div><div className="delta">{nonPrincipals.length} non-principal + 1 principal</div></div>
+      </div>
+    </div>
+    <div className="card" style={{background:'var(--bg)'}}>
+      <div className="card-title">What the tool does NOT enforce</div>
+      <ul style={{paddingLeft:20,fontSize:13,color:'var(--ink-soft)',lineHeight:1.8}}>
+        <li>Hard caps on repeated subjects per day (you can stack the same subject back-to-back if the allocation allows).</li>
+        <li>Lab / paired-period blocks — double-period labs must be arranged manually.</li>
+        <li>Teacher personal preferences (e.g. "no periods on Wednesday morning") unless modeled via the lecture-based availability window.</li>
+        <li>Break-time supervision duty rosters — proxy slips cover absence only.</li>
+      </ul>
+    </div>
   </div>);
 }
 
