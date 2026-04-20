@@ -1095,35 +1095,31 @@ function AllocatePage({data,update}){
 
 // ===== Timetable =====
 function TimetablePage({data,update}){
-  // Timetable Builder is intentionally INDEPENDENT of Day Structure:
-  // it always uses the standard Mon-Sat working week and a local session
-  // selection so that changing days or session in Day Structure cannot
-  // accidentally hide or reshape an existing class timetable.
+  // Timetable Builder decouples ONLY the working-days list from Day Structure
+  // (TB_DAYS is always Mon-Sat), so removing Saturday in the working-days
+  // picker cannot hide saved Saturday slots here. Per-standard period grids
+  // (durations, start/end, recess order) and the active session are read
+  // from data.school so edits made in Day Structure propagate immediately,
+  // per standard.
   const TB_DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const[classId,setClassId]=useState(data.classes[0]?data.classes[0].id:'');const[picker,setPicker]=useState(null);
   const[dayFilter,setDayFilter]=useState([]); // array of selected day indices; empty = All Days
-  const[tbSession,setTbSession]=useState(data.school.activeSession||'normal');
   const toggleDay=i=>setDayFilter(a=>a.includes(i)?a.filter(x=>x!==i):[...a,i].sort((x,y)=>x-y));
   const selectAllDays=()=>setDayFilter([]);
   const showingAll=!dayFilter.length||dayFilter.length===TB_DAYS.length;
-  // Build period grids locally for the chosen session so Day Structure edits don't bleed in.
-  const tbPeriods=useMemo(()=>{
-    const pr=SESSION_PRESETS[tbSession];
-    if(!pr)return{preprimary:data.school.preprimaryPeriods||[],primary:data.school.primaryPeriods||[],upper:data.school.upperPeriods||data.school.primaryPeriods||[]};
-    return{preprimary:buildSessionPeriods(pr.preprimary),primary:buildSessionPeriods(pr.primary),upper:buildSessionPeriods(pr.upper)};
-  },[tbSession,data.school.preprimaryPeriods,data.school.primaryPeriods,data.school.upperPeriods]);
-  // Effective school used for conflict detection and helpers, without mutating data.school.
-  const tbSchool=useMemo(()=>({...data.school,days:TB_DAYS,preprimaryPeriods:tbPeriods.preprimary,primaryPeriods:tbPeriods.primary,upperPeriods:tbPeriods.upper}),[data.school,tbPeriods]);
-  const getTbPeriods=c=>{if(!c)return tbPeriods.primary;return c.group==='preprimary'?tbPeriods.preprimary:c.group==='upper'?tbPeriods.upper:tbPeriods.primary;};
+  // Effective school for conflict detection + getPeriodsForClass: same as
+  // data.school but with the fixed Mon-Sat day list.
+  const tbSchool=useMemo(()=>({...data.school,days:TB_DAYS}),[data.school]);
   const conflicts=useMemo(()=>findConflicts(data.timetable,data.classes,tbSchool),[data.timetable,data.classes,tbSchool]);
   useEffect(()=>{if(!classId&&data.classes[0])setClassId(data.classes[0].id);},[data.classes,classId]);
 
-  // Session switcher — local only; does NOT update data.school
-  const switchSession=k=>setTbSession(k);
-  const activeSession=tbSession;
+  // Session switcher — writes back to data.school so Day Structure and
+  // Timetable Builder stay in sync on session changes from either tab.
+  const switchSession=k=>{const pr=SESSION_PRESETS[k];update({school:{...data.school,activeSession:k,preprimaryPeriods:buildSessionPeriods(pr.preprimary),primaryPeriods:buildSessionPeriods(pr.primary),upperPeriods:buildSessionPeriods(pr.upper),preprimaryStart:pr.preprimary.startTime,primaryStart:pr.primary.startTime,upperStart:pr.upper.startTime}});};
+  const activeSession=data.school.activeSession||'normal';
 
   if(!data.classes.length)return<div><div className="pagehead"><div><h1 className="serif"><em>Timetable</em></h1></div></div><div className="card"><div className="empty-state"><h3>Add classes first</h3></div></div></div>;
-  const cls=data.classes.find(c=>c.id===classId);const pList=cls?getTbPeriods(cls):tbPeriods.primary;const tCount=getTeachingCount(pList);
+  const cls=data.classes.find(c=>c.id===classId);const pList=cls?getPeriodsForClass(tbSchool,cls):data.school.primaryPeriods;const tCount=getTeachingCount(pList);
   const setCell=(sId,roomId)=>{if(!picker)return;const tId=sId?data.allocations[allocKey(classId,sId)]:null;const tt=JSON.parse(JSON.stringify(data.timetable));if(!tt[classId])tt[classId]={};if(!tt[classId][picker.d])tt[classId][picker.d]={};if(sId)tt[classId][picker.d][picker.p]={subjectId:sId,teacherId:tId||null,roomId:roomId||null};else delete tt[classId][picker.d][picker.p];update({timetable:tt});setPicker(null);};
   const clearClass=()=>{if(!confirm('Clear?'))return;const tt={...data.timetable};delete tt[classId];update({timetable:tt});};
 
@@ -1251,7 +1247,7 @@ function TimetablePage({data,update}){
   const totalDayMin=pList.reduce((s,p)=>s+(p.duration||0),0);
   const conflictCount=Object.keys(conflicts).filter(k=>k.startsWith(classId+'|')).length;
   return(<div>
-    <div className="pagehead"><div><h1 className="serif"><em>Timetable</em> Builder</h1><div className="sub">Independent of Day Structure: uses Mon–Sat and the locally-picked session. Red dot = teacher conflict. Yellow dot = room conflict. Auto-fill is conflict-aware.</div></div><div className="actions">
+    <div className="pagehead"><div><h1 className="serif"><em>Timetable</em> Builder</h1><div className="sub">Always Mon–Sat. Per-standard period arrangement follows Day Structure. Red dot = teacher conflict. Yellow dot = room conflict. Auto-fill is conflict-aware.</div></div><div className="actions">
       <ExportBar title={'Timetable – '+(cls?cls.name:'')} headers={ttExpH} rows={ttExpR} subtitle={cls?cls.name:''}/>
       <button className="btn btn-ghost" onClick={autoFill}>Auto-fill</button><button className="btn btn-danger" onClick={clearClass}>Clear</button></div></div>
 
@@ -1263,7 +1259,6 @@ function TimetablePage({data,update}){
         </div>
         <span style={{fontSize:12,color:'var(--ink-muted)'}}>Teaching: {totalTeachMin} min | Day: {totalDayMin} min ({Math.floor(totalDayMin/60)}h {totalDayMin%60}m)</span>
         {conflictCount>0&&<span className="badge badge-err">{conflictCount} conflicts</span>}
-        <span style={{fontSize:11,color:'var(--ink-muted)',fontStyle:'italic'}}>local view — does not change Day Structure</span>
       </div>
     </div>
 
