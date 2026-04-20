@@ -28,7 +28,15 @@
   ::-webkit-scrollbar-thumb:hover{background:var(--ink-muted)}
 
   .app{display:flex;min-height:100vh}
-  .sidebar{width:240px;background:var(--paper);border-right:1px solid var(--line);padding:28px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .sidebar{width:240px;background:var(--paper);border-right:1px solid var(--line);padding:28px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto;transition:width .2s ease}
+  .sidebar.collapsed{width:64px}
+  .sidebar.collapsed .brand,.sidebar.collapsed .footer-note{display:none}
+  .sidebar.collapsed .nav{padding:20px 8px}
+  .sidebar.collapsed .nav-item{justify-content:center;padding:10px 0}
+  .sidebar.collapsed .nav-item span:not(.num){display:none}
+  .sidebar-toggle{width:28px;height:28px;border:1px solid var(--line);border-radius:6px;background:var(--paper);display:flex;align-items:center;justify-content:center;color:var(--ink-muted);cursor:pointer;font-size:13px;margin:0 14px 10px;align-self:flex-end;transition:all .15s}
+  .sidebar-toggle:hover{background:var(--bg);color:var(--ink);border-color:var(--ink-muted)}
+  .sidebar.collapsed .sidebar-toggle{align-self:center;margin:0 0 10px}
   .brand{padding:0 28px 24px;border-bottom:1px solid var(--line)}
   .brand .mark{font-size:11px;letter-spacing:0.18em;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px}
   .brand .name{font-size:24px;line-height:1.1;color:var(--ink)}
@@ -41,7 +49,8 @@
   .nav-item.active .num{color:var(--paper);opacity:.6}
   .footer-note{padding:16px 28px;font-size:11px;color:var(--ink-muted);border-top:1px solid var(--line);line-height:1.6}
 
-  .main{flex:1;padding:36px 48px 80px;max-width:calc(100vw - 240px);overflow-x:hidden}
+  .main{flex:1;padding:36px 48px 80px;max-width:calc(100vw - 240px);overflow-x:hidden;transition:max-width .2s ease}
+  .main.sidebar-collapsed{max-width:calc(100vw - 64px)}
   .pagehead{margin-bottom:32px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
   .pagehead h1{font-size:42px;line-height:1.05;color:var(--ink);margin-bottom:6px}
   .pagehead .sub{color:var(--ink-soft);font-size:14px;max-width:560px}
@@ -574,16 +583,19 @@ function SearchSelect({value,options,onChange,placeholder,style:wrapStyle}){
 // ====== App ======
 function App(){
   const[data,setData]=useState(null);const[tab,setTab]=useState('dashboard');const[loading,setLoading]=useState(true);
+  const[sidebarCollapsed,setSidebarCollapsed]=useState(()=>{try{return localStorage.getItem('tws_sidebar_collapsed')==='1'}catch(e){return false}});
   useEffect(()=>{loadData().then(d=>{setData(d);setLoading(false);});},[]);
   useEffect(()=>{if(data&&!loading)saveData(data);},[data,loading]);
+  useEffect(()=>{try{localStorage.setItem('tws_sidebar_collapsed',sidebarCollapsed?'1':'0')}catch(e){}},[sidebarCollapsed]);
   if(loading||!data)return<div style={{padding:40,color:'#8a8f88'}}>Loading…</div>;
   const update=patch=>setData(d=>({...d,...patch}));
   const tabs=[{id:'dashboard',num:'01',name:'Overview'},{id:'school',num:'02',name:'Day Structure'},{id:'classes',num:'03',name:'Classes'},{id:'qualmaster',num:'04',name:'Qual. Master'},{id:'teachers',num:'05',name:'Faculty'},{id:'subjects',num:'06',name:'Subjects'},{id:'allocate',num:'07',name:'Allocations'},{id:'timetable',num:'08',name:'Timetable'},{id:'load',num:'09',name:'Teacher Load'},{id:'proxy',num:'10',name:'Proxy Mgmt'}];
   return(
     <div className="app">
-      <aside className="sidebar">
+      <aside className={`sidebar ${sidebarCollapsed?'collapsed':''}`}>
+        <button className="sidebar-toggle" onClick={()=>setSidebarCollapsed(v=>!v)} title={sidebarCollapsed?'Expand sidebar':'Collapse sidebar'}>{sidebarCollapsed?'»':'«'}</button>
         <div className="brand"><div className="mark">The World School · ICSE</div><div className="name serif">Timetable <em>Studio</em></div></div>
-        <nav className="nav">{tabs.map(t=>(<button key={t.id} className={`nav-item ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)}><span className="num">{t.num}</span><span>{t.name}</span></button>))}</nav>
+        <nav className="nav">{tabs.map(t=>(<button key={t.id} className={`nav-item ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)} title={sidebarCollapsed?t.name:undefined}><span className="num">{t.num}</span><span>{t.name}</span></button>))}</nav>
         <div className="footer-note" style={{padding:'12px 14px'}}>
           <button className="btn btn-primary btn-sm" style={{width:'100%',marginBottom:6,justifyContent:'center'}} onClick={()=>saveAsHTMLFile(data)}>Save as File</button>
           <div style={{display:'flex',gap:6}}>
@@ -592,7 +604,7 @@ function App(){
           </div>
         </div>
       </aside>
-      <main className="main">
+      <main className={`main ${sidebarCollapsed?'sidebar-collapsed':''}`}>
         {tab==='dashboard'&&<Dashboard data={data} setTab={setTab}/>}
         {tab==='school'&&<SchoolSetup data={data} update={update}/>}
         {tab==='classes'&&<ClassesPage data={data} update={update}/>}
@@ -687,19 +699,20 @@ function SchoolSetup({data,update}){
 
 // ===== Classes =====
 function ClassesPage({data,update}){
-  const[name,setName]=useState('');const[strength,setStrength]=useState('');const[teacher,setTeacher]=useState('');const[grp,setGrp]=useState('primary');
+  const[name,setName]=useState('');const[strength,setStrength]=useState('');const[teacher,setTeacher]=useState('');const[grp,setGrp]=useState('primary');const[firstSubject,setFirstSubject]=useState('');
   const[editId,setEditId]=useState(null);const[draft,setDraft]=useState(null);
-  const add=()=>{if(!name.trim())return;const grade=grp==='preprimary'?0:parseInt(name)||0;update({classes:[...data.classes,{id:uid(),name:name.trim(),group:grp,strength:Number(strength)||0,classTeacherId:teacher||null,grade}]});setName('');setStrength('');setTeacher('');};
+  const add=()=>{if(!name.trim())return;const grade=grp==='preprimary'?0:parseInt(name)||0;update({classes:[...data.classes,{id:uid(),name:name.trim(),group:grp,strength:Number(strength)||0,classTeacherId:teacher||null,firstSubjectId:firstSubject||null,grade}]});setName('');setStrength('');setTeacher('');setFirstSubject('');};
   const startEdit=c=>{setEditId(c.id);setDraft({...c});};
   const cancelEdit=()=>{setEditId(null);setDraft(null);};
   const saveEdit=()=>{if(!draft)return;update({classes:data.classes.map(c=>c.id===draft.id?draft:c)});setEditId(null);setDraft(null);};
   const deleteClass=id=>{if(!confirm('Delete this class and its timetable?'))return;setEditId(null);setDraft(null);update({classes:data.classes.filter(c=>c.id!==id),timetable:Object.fromEntries(Object.entries(data.timetable).filter(([k])=>k!==id))});};
   const tOpts=data.teachers.map(t=>({value:t.id,label:t.code+' – '+t.name}));
+  const sOpts=data.subjects.map(s=>({value:s.id,label:s.code+' – '+s.name}));
   const iStyle={padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontSize:12.5};
-  const expH=['Section','Group','Strength','Class Teacher'];
-  const expR=data.classes.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);return[c.name,c.group==='primary'?'Primary':'Upper',c.strength||'',ct?ct.name:''];});
+  const expH=['Section','Group','Strength','Class Teacher','Default First Subject'];
+  const expR=data.classes.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);const fs=c.firstSubjectId?data.subjects.find(s=>s.id===c.firstSubjectId):null;return[c.name,c.group==='primary'?'Primary':'Upper',c.strength||'',ct?ct.name:'',fs?fs.name:''];});
   return(<div>
-    <div className="pagehead"><div><h1 className="serif"><em>Classes</em> & Sections</h1><div className="sub">Click any row to edit name, strength, group, or class teacher.</div></div>
+    <div className="pagehead"><div><h1 className="serif"><em>Classes</em> & Sections</h1><div className="sub">Click any row to edit name, strength, group, class teacher, or default first-period subject. The Default First Subject auto-fills the first teaching period of every day for that class.</div></div>
       <ExportBar title="Classes & Sections" headers={expH} rows={expR}/>
     </div>
     <div className="card"><div className="card-title">Add a Class</div><div className="row">
@@ -707,26 +720,29 @@ function ClassesPage({data,update}){
       <div className="field"><label>Group</label><select value={grp} onChange={e=>setGrp(e.target.value)}><option value="preprimary">Pre-Primary</option><option value="primary">Primary</option><option value="upper">Upper</option></select></div>
       <div className="field"><label>Strength</label><input type="number" placeholder="35" value={strength} onChange={e=>setStrength(e.target.value)}/></div>
       <div className="field"><label>Class Teacher</label><SearchSelect value={teacher} options={[{value:'',label:'-- None --'},...tOpts]} onChange={setTeacher}/></div>
+      <div className="field"><label>First Subject / Day</label><SearchSelect value={firstSubject} options={[{value:'',label:'-- None --'},...sOpts]} onChange={setFirstSubject}/></div>
       <button className="btn btn-primary" onClick={add}>Add</button>
     </div></div>
     <div className="card" style={{padding:0,overflow:'hidden'}}>{data.classes.length===0?<div className="empty-state"><h3 className="serif">No classes</h3></div>:
-      <table><thead><tr><th>Section</th><th>Group</th><th>Strength</th><th>Class Teacher</th><th></th></tr></thead><tbody>
-        {data.classes.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);return(
+      <table><thead><tr><th>Section</th><th>Group</th><th>Strength</th><th>Class Teacher</th><th>1st Subject / Day</th><th></th></tr></thead><tbody>
+        {data.classes.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);const fs=c.firstSubjectId?data.subjects.find(s=>s.id===c.firstSubjectId):null;return(
           <React.Fragment key={c.id}>
           <tr style={{cursor:'pointer'}} onClick={()=>editId===c.id?null:startEdit(c)}>
             <td style={{fontWeight:600}}>{c.name}</td>
             <td><span className={`badge ${c.group==='preprimary'?'':c.group==='primary'?'badge-ok':'badge-warn'}`}>{c.group==='preprimary'?'PRE':c.group==='primary'?'PRI':'UPR'}</span></td>
             <td>{c.strength||'--'}</td>
             <td>{ct?ct.name:<span style={{color:'var(--ink-muted)'}}>--</span>}</td>
+            <td>{fs?<span className="chip" style={{background:fs.color+'22',color:fs.color}}><span className="chip-color" style={{background:fs.color}}></span>{fs.code}</span>:<span style={{color:'var(--ink-muted)'}}>--</span>}</td>
             <td style={{textAlign:'right'}} onClick={e=>e.stopPropagation()}><button className="btn btn-icon btn-danger" onClick={()=>deleteClass(c.id)}>x</button></td>
           </tr>
           {editId===c.id&&draft&&(
-            <tr><td colSpan={5} style={{background:'var(--bg)',padding:'16px 18px',borderLeft:'3px solid var(--accent)'}} onClick={e=>e.stopPropagation()}>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 120px 100px 1fr',gap:12,alignItems:'end',marginBottom:12}}>
+            <tr><td colSpan={6} style={{background:'var(--bg)',padding:'16px 18px',borderLeft:'3px solid var(--accent)'}} onClick={e=>e.stopPropagation()}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 120px 100px 1fr 1fr',gap:12,alignItems:'end',marginBottom:12}}>
                 <div className="field" style={{margin:0}}><label>Section Name</label><input value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))} style={iStyle}/></div>
                 <div className="field" style={{margin:0}}><label>Group</label><select value={draft.group} onChange={e=>setDraft(d=>({...d,group:e.target.value}))} style={iStyle}><option value="preprimary">Pre-Primary</option><option value="primary">Primary</option><option value="upper">Upper</option></select></div>
                 <div className="field" style={{margin:0}}><label>Strength</label><input type="number" value={draft.strength||''} onChange={e=>setDraft(d=>({...d,strength:Number(e.target.value)||0}))} style={iStyle}/></div>
                 <div className="field" style={{margin:0}}><label>Class Teacher</label><SearchSelect value={draft.classTeacherId||''} options={[{value:'',label:'-- None --'},...tOpts]} onChange={v=>setDraft(d=>({...d,classTeacherId:v||null}))}/></div>
+                <div className="field" style={{margin:0}}><label>First Subject / Day</label><SearchSelect value={draft.firstSubjectId||''} options={[{value:'',label:'-- None --'},...sOpts]} onChange={v=>setDraft(d=>({...d,firstSubjectId:v||null}))}/></div>
               </div>
               <div style={{display:'flex',gap:8,justifyContent:'flex-end',borderTop:'1px solid var(--line)',paddingTop:12}}>
                 <button className="btn btn-danger" onClick={()=>deleteClass(draft.id)}>Delete</button>
@@ -1080,7 +1096,8 @@ function TimetablePage({data,update}){
       if(!t.availFrom||!t.availTo) return true;
       return start>=t.availFrom&&end<=t.availTo;
     };
-    // First lecture of each day = class teacher
+    // First lecture of each day = default first subject (if set) else class teacher
+    const firstSubjectId=cls?cls.firstSubjectId:null;
     const classTeacherId=cls?cls.classTeacherId:null;
     const firstPosPerDay={};
     positions.forEach(pos=>{if(firstPosPerDay[pos.dIdx]===undefined)firstPosPerDay[pos.dIdx]=pos;});
@@ -1089,8 +1106,21 @@ function TimetablePage({data,update}){
       const busyKey=dIdx+'|'+start+'|'+end;
       const busySet=busyMap[busyKey]||new Set();
       const selfBusy=placed[busyKey]||new Set();
-      // First teaching period of each day: prefer class teacher's subject
+      // First teaching period of each day
       const isFirstPeriod=firstPosPerDay[dIdx]&&firstPosPerDay[dIdx].pIdx===pIdx;
+      // (a) Explicit class default first-subject takes top priority
+      if(isFirstPeriod&&firstSubjectId&&poolCopy.length>0){
+        const fsIdx=poolCopy.findIndex(item=>item.subjectId===firstSubjectId&&(!item.teacherId||(!busySet.has(item.teacherId)&&!selfBusy.has(item.teacherId)&&isTeacherAvailable(item.teacherId,start,end))));
+        if(fsIdx!==-1){
+          const item=poolCopy.splice(fsIdx,1)[0];
+          if(!tt[classId][dIdx]) tt[classId][dIdx]={};
+          tt[classId][dIdx][pIdx]={subjectId:item.subjectId,teacherId:item.teacherId,roomId:null};
+          if(item.teacherId){if(!placed[busyKey])placed[busyKey]=new Set();placed[busyKey].add(item.teacherId);}
+          return;
+        }
+        // If no pool entry matched (e.g. firstSubject isn't allocated), fall through to class-teacher logic
+      }
+      // (b) Otherwise prefer a subject taught by the class teacher
       if(isFirstPeriod&&classTeacherId&&poolCopy.length>0){
         const ctIdx=poolCopy.findIndex(item=>item.teacherId===classTeacherId&&!busySet.has(item.teacherId)&&!selfBusy.has(item.teacherId)&&isTeacherAvailable(item.teacherId,start,end));
         if(ctIdx!==-1){
