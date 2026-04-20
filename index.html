@@ -501,7 +501,30 @@ async function loadData(){
 async function saveData(d){try{await store.set(STORAGE_KEY,JSON.stringify(d))}catch(e){}}
 
 // ====== Save/Export/Import ======
-function exportJSON(data){const n=prompt('Save data as:','TWS_Timetable_Data_'+new Date().toISOString().slice(0,10));if(!n)return;const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=n.endsWith('.json')?n:n+'.json';a.click();URL.revokeObjectURL(u);}
+// DDMMYY_HHMM — compact timestamp suitable for filenames (e.g. 200426_1845).
+function fmtTimestamp(d){const x=d||new Date();const p=n=>String(n).padStart(2,'0');return p(x.getDate())+p(x.getMonth()+1)+String(x.getFullYear()).slice(-2)+'_'+p(x.getHours())+p(x.getMinutes());}
+function exportJSON(data,opts){
+  const defaultName='TWS_'+fmtTimestamp();
+  const n=(opts&&opts.silent)?defaultName:prompt('Save data as:',defaultName);
+  if(!n)return;
+  const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;
+  a.download=n.endsWith('.json')?n:n+'.json';a.click();URL.revokeObjectURL(u);
+}
+// Classes — normalize by a sortable key so Nursery → LKG → UKG → 1 → 2 … → 10
+// even when rows are added later. Grade > 0 rows come after pre-primary tokens.
+function classSortKey(c){
+  if(!c)return 999;
+  const grade=(c.grade==null?parseInt(((c.name||'').match(/^(\d+)/)||[])[1]||'0'):c.grade)||0;
+  if(grade>0)return grade+10; // 1..10 -> 11..20
+  const n=(c.name||'').toLowerCase();
+  if(/\bnursery\b|^nur/.test(n))return 1;
+  if(/\bjr\.?\s*kg\b|^jkg\b|\blkg\b/.test(n))return 2;
+  if(/\bsr\.?\s*kg\b|^skg\b|\bukg\b/.test(n))return 3;
+  if(c.group==='preprimary')return 4;
+  return 10;
+}
+function sortClasses(arr){return[...(arr||[])].sort((a,b)=>{const d=classSortKey(a)-classSortKey(b);return d!==0?d:(a.name||'').localeCompare(b.name||'');});}
 function saveAsHTMLFile(data){const n=prompt('Save timetable file as:','TWS_Timetable_Studio_'+new Date().toISOString().slice(0,10));if(!n)return;const h=document.documentElement.outerHTML.replace(/<script id="tws-embedded-data">[\s\S]*?<\/script>\s*/g,'');const ds='<script id="tws-embedded-data">window.__TWS_EMBEDDED_DATA='+JSON.stringify(data)+';<\/script>';const f=h.replace('</body>',ds+'\n</body>');const b=new Blob(['<!DOCTYPE html>\n<html>'+f.replace(/^<html[^>]*>/,'')],{type:'text/html'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=(n.endsWith('.html')?n:n+'.html');a.click();URL.revokeObjectURL(u);}
 function importJSON(cb){const i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=migrateData(JSON.parse(ev.target.result));if(d.school&&d.classes&&d.teachers)cb(d);else alert('Invalid file.');}catch(e){alert('Parse error.');}};r.readAsText(f);};i.click();}
 
@@ -734,6 +757,8 @@ function SchoolSetup({data,update}){
   const[session,setSession]=useState(data.school.activeSession||'normal');
   const[group,setGroup]=useState('primary');
   const[category,setCategory]=useState('weekdays');
+  const[savedAt,setSavedAt]=useState(0);
+  useEffect(()=>{if(!savedAt)return;const t=setTimeout(()=>setSavedAt(0),6000);return()=>clearTimeout(t);},[savedAt]);
   const dayCats=data.school.dayCategories||{weekdays:[],activity:[],bagless:[]};
   const catPeriods=data.school.categoryPeriods||{};
   const getPeriods=(cat,g)=>{const cp=catPeriods[cat]||{};const key=g==='preprimary'?'preprimaryPeriods':g==='upper'?'upperPeriods':'primaryPeriods';return(cp[key]||[]).map(p=>({...p}));};
@@ -777,6 +802,7 @@ function SchoolSetup({data,update}){
       if(w.preprimaryStart)patch.preprimaryStart=w.preprimaryStart;if(w.primaryStart)patch.primaryStart=w.primaryStart;if(w.upperStart)patch.upperStart=w.upperStart;
     }
     update({school:{...data.school,...patch}});
+    setSavedAt(Date.now());
   };
   const updP=(i,k,v)=>setEdited(p=>{const n=[...p];n[i]={...n[i],[k]:v};if(k==='duration')return calcTimes(startTime,n);return n;});
   const addP=()=>setEdited(p=>calcTimes(startTime,[...p,{name:'New',duration:35}]));
@@ -859,6 +885,17 @@ function SchoolSetup({data,update}){
         {edited.map((p,i)=>(<tr key={i}><td className="mono" style={{color:'var(--ink-muted)'}}>{String(i+1).padStart(2,'0')}</td><td><input value={p.name} onChange={e=>updP(i,'name',e.target.value)} style={{width:140,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><input type="number" value={p.duration||30} onChange={e=>updP(i,'duration',Number(e.target.value)||1)} style={{width:70,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,textAlign:'center'}} min={1}/></td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.start||''}</td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.end||''}</td><td><button className="btn btn-ghost btn-sm" style={tStyle(p)} onClick={()=>cycleType(i)}>{tLabel(p)}</button></td><td style={{whiteSpace:'nowrap',textAlign:'center'}}><button className="btn btn-icon" disabled={i===0} onClick={()=>moveP(i,-1)} title="Move up" style={{opacity:i===0?0.3:1}}>▲</button><button className="btn btn-icon" disabled={i===edited.length-1} onClick={()=>moveP(i,1)} title="Move down" style={{opacity:i===edited.length-1?0.3:1}}>▼</button></td><td style={{textAlign:'right'}}><button className="btn btn-icon btn-danger" onClick={()=>remP(i)}>x</button></td></tr>))}
       </tbody></table>
     </div>
+    {savedAt>0&&(
+      <div style={{position:'fixed',bottom:24,right:24,zIndex:100,background:'var(--paper)',border:'1px solid var(--accent)',borderLeft:'4px solid var(--accent)',borderRadius:8,padding:'14px 18px',boxShadow:'0 10px 30px rgba(0,0,0,0.12)',maxWidth:340}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:6}}>
+          <div style={{width:22,height:22,borderRadius:'50%',background:'var(--accent)',color:'var(--paper)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:600}}>✓</div>
+          <div style={{fontWeight:600,fontSize:14,color:'var(--accent)'}}>Saved Successfully</div>
+          <button onClick={()=>setSavedAt(0)} style={{marginLeft:'auto',border:'none',background:'transparent',color:'var(--ink-muted)',cursor:'pointer',fontSize:16,padding:0,lineHeight:1}}>×</button>
+        </div>
+        <div style={{fontSize:12,color:'var(--ink-soft)',marginBottom:10,lineHeight:1.4}}>Export JSON for future reference — filename includes today's date &amp; time.</div>
+        <button className="btn btn-primary btn-sm" style={{width:'100%',justifyContent:'center'}} onClick={()=>{exportJSON(data,{silent:true});setSavedAt(0);}}>Export JSON</button>
+      </div>
+    )}
   </div>);
 }
 
@@ -887,7 +924,8 @@ function ClassesPage({data,update}){
   const setDraftTeacher=v=>setDraft(d=>{if(!d)return d;const t=v?data.teachers.find(x=>x.id===v):null;const allowed=t&&t.subjects&&t.subjects.length?t.subjects:null;const keepFirst=!allowed||!d.firstSubjectId||allowed.includes(d.firstSubjectId);return{...d,classTeacherId:v||null,firstSubjectId:keepFirst?d.firstSubjectId:null};});
   const iStyle={padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontSize:12.5};
   const expH=['Section','Group','Strength','Class Teacher','Default First Subject'];
-  const expR=data.classes.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);const fs=c.firstSubjectId?data.subjects.find(s=>s.id===c.firstSubjectId):null;return[c.name,c.group==='primary'?'Primary':'Upper',c.strength||'',ct?ct.name:'',fs?fs.name:''];});
+  const sortedClassList=sortClasses(data.classes);
+  const expR=sortedClassList.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);const fs=c.firstSubjectId?data.subjects.find(s=>s.id===c.firstSubjectId):null;return[c.name,c.group==='primary'?'Primary':'Upper',c.strength||'',ct?ct.name:'',fs?fs.name:''];});
   return(<div>
     <div className="pagehead"><div><h1 className="serif"><em>Classes</em> & Sections</h1><div className="sub">Click any row to edit name, strength, group, class teacher, or default first-period subject. The Default First Subject auto-fills the first teaching period of every day for that class.</div></div>
       <ExportBar title="Classes & Sections" headers={expH} rows={expR}/>
@@ -902,7 +940,7 @@ function ClassesPage({data,update}){
     </div></div>
     <div className="card" style={{padding:0,overflow:'hidden'}}>{data.classes.length===0?<div className="empty-state"><h3 className="serif">No classes</h3></div>:
       <table><thead><tr><th>Section</th><th>Group</th><th>Strength</th><th>Class Teacher</th><th>1st Subject / Day</th><th></th></tr></thead><tbody>
-        {data.classes.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);const fs=c.firstSubjectId?data.subjects.find(s=>s.id===c.firstSubjectId):null;return(
+        {sortedClassList.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);const fs=c.firstSubjectId?data.subjects.find(s=>s.id===c.firstSubjectId):null;return(
           <React.Fragment key={c.id}>
           <tr style={{cursor:'pointer'}} onClick={()=>editId===c.id?null:startEdit(c)}>
             <td style={{fontWeight:600}}>{c.name}</td>
@@ -1075,7 +1113,7 @@ function TeachersPage({data,update}){
                   </div>
                   <div style={{marginBottom:12}}>
                     <label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Assigned Classes</label>
-                    <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{data.classes.map(c=>(<button key={c.id} onClick={()=>{const arr=draft.assignedClasses||[];updDraft('assignedClasses',arr.includes(c.id)?arr.filter(x=>x!==c.id):[...arr,c.id]);}} className={(draft.assignedClasses||[]).includes(c.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{c.name}</button>))}</div>
+                    <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{sortClasses(data.classes).map(c=>(<button key={c.id} onClick={()=>{const arr=draft.assignedClasses||[];updDraft('assignedClasses',arr.includes(c.id)?arr.filter(x=>x!==c.id):[...arr,c.id]);}} className={(draft.assignedClasses||[]).includes(c.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{c.name}</button>))}</div>
                   </div>
                 </div>
               </div>
@@ -1165,17 +1203,19 @@ function AllocatePage({data,update}){
   const toggleBulkClass=cId=>setBulkClasses(a=>a.includes(cId)?a.filter(x=>x!==cId):[...a,cId]);
   const bulkAssign=()=>{if(!bulkSubj||!bulkTeacher||!bulkClasses.length)return;const a={...data.allocations};bulkClasses.forEach(cId=>{a[allocKey(cId,bulkSubj)]=bulkTeacher;});update({allocations:a});setBulkClasses([]);};
   const getSubjectsForClass=(cls)=>{const grade=cls.grade||0;return data.subjects.filter(s=>!(s.standards||[]).length||(s.standards||[]).includes(grade));};
+  const sortedAllClasses=sortClasses(data.classes);
 
-  // Teacher-driven filter: once a teacher is picked, show only their qualified subjects
-  // and their assigned classes (both configured in the Faculty tab). When either list
-  // is empty on the profile, fall back to showing all so users aren't locked out.
+  // Bi-directional filter.
+  // Pick a teacher -> subjects + classes narrow to their Faculty profile.
+  // Pick a subject first (and optionally classes) -> teachers narrow to
+  // those qualified for the subject and assigned to at least one picked class.
   const selectedTeacher=bulkTeacher?data.teachers.find(t=>t.id===bulkTeacher):null;
   const teacherSubjIds=selectedTeacher&&selectedTeacher.subjects&&selectedTeacher.subjects.length?new Set(selectedTeacher.subjects):null;
   const teacherClassIds=selectedTeacher&&selectedTeacher.assignedClasses&&selectedTeacher.assignedClasses.length?new Set(selectedTeacher.assignedClasses):null;
   const teacherSubjChips=selectedTeacher?(selectedTeacher.subjects||[]).map(sId=>data.subjects.find(s=>s.id===sId)).filter(Boolean):[];
   const teacherClassChips=selectedTeacher?(selectedTeacher.assignedClasses||[]).map(cId=>data.classes.find(c=>c.id===cId)).filter(Boolean):[];
 
-  // Auto-clear stale selections when the teacher changes to someone incompatible
+  // Auto-clear stale selections when the teacher or subject changes to something incompatible
   useEffect(()=>{
     if(!selectedTeacher){return;}
     if(teacherSubjIds&&bulkSubj&&!teacherSubjIds.has(bulkSubj)) setBulkSubj('');
@@ -1186,13 +1226,29 @@ function AllocatePage({data,update}){
 
   const allSubjIds=[...new Set(data.classes.flatMap(c=>getSubjectsForClass(c).map(s=>s.id)))];
   const visibleSubjects=data.subjects.filter(s=>allSubjIds.includes(s.id));
-  const expH=['Class',...visibleSubjects.map(s=>s.code)];
-  const expR=data.classes.map(c=>{const applicable=getSubjectsForClass(c);return[c.name,...visibleSubjects.map(s=>{if(!applicable.find(x=>x.id===s.id))return'–';const tId=data.allocations[allocKey(c.id,s.id)];const t=tId?data.teachers.find(x=>x.id===tId):null;return t?t.code:'';})];});
-  // Subject dropdown: scoped to teacher's qualified subjects when one is picked
+  const expH=['Class','Group','# Subjects',...visibleSubjects.map(s=>s.code)];
+  const expR=sortedAllClasses.map(c=>{
+    const applicable=getSubjectsForClass(c);
+    const allocatedCount=visibleSubjects.filter(s=>applicable.find(x=>x.id===s.id)&&data.allocations[allocKey(c.id,s.id)]).length;
+    return[c.name,c.group==='preprimary'?'Pre-Pri':c.group==='upper'?'Upper':'Primary',allocatedCount,...visibleSubjects.map(s=>{if(!applicable.find(x=>x.id===s.id))return'–';const tId=data.allocations[allocKey(c.id,s.id)];const t=tId?data.teachers.find(x=>x.id===tId):null;return t?t.code:'';})];
+  });
+  // Subject dropdown: scoped to teacher's qualified subjects when a teacher is picked
   const subjOpts=data.subjects.filter(s=>!teacherSubjIds||teacherSubjIds.has(s.id)).map(s=>({value:s.id,label:s.code+' – '+s.name}));
-  const teacherOpts=data.teachers.map(t=>({value:t.id,label:t.code+' – '+t.name}));
+  // Teacher dropdown: scoped by selected subject + any picked classes
+  const subjClassFilteredTeachers=data.teachers.filter(t=>{
+    if(bulkSubj){
+      const subs=t.subjects||[];
+      if(subs.length&&!subs.includes(bulkSubj))return false;
+    }
+    if(bulkClasses.length){
+      const asg=t.assignedClasses||[];
+      if(asg.length&&!bulkClasses.some(cId=>asg.includes(cId)))return false;
+    }
+    return true;
+  });
+  const teacherOpts=subjClassFilteredTeachers.map(t=>({value:t.id,label:t.code+' – '+t.name}));
   // Class chips: teacher's assigned classes ∩ subject-standards filter
-  const eligibleClasses=data.classes.filter(c=>{
+  const eligibleClasses=sortedAllClasses.filter(c=>{
     if(teacherClassIds&&!teacherClassIds.has(c.id))return false;
     if(!bulkSubj)return true;
     const subj=data.subjects.find(s=>s.id===bulkSubj);
@@ -1201,13 +1257,13 @@ function AllocatePage({data,update}){
   });
 
   return(<div>
-    <div className="pagehead"><div><h1 className="serif">Subject <em>Allocations</em></h1><div className="sub">Subjects auto-filter by standard. Pick a teacher in Bulk Assign to scope subjects and classes to their Faculty profile.</div></div>
+    <div className="pagehead"><div><h1 className="serif">Subject <em>Allocations</em></h1><div className="sub">Pick a teacher to scope subjects + classes, or pick a subject first and the teacher list narrows to teachers qualified for that subject (and assigned to the picked classes).</div></div>
       <ExportBar title="Subject Allocations" headers={expH} rows={expR}/>
     </div>
     <div className="card"><div className="card-title">Bulk Assign</div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
         <div className="field" style={{margin:0}}><label>Subject</label><SearchSelect value={bulkSubj} options={[{value:'',label:bulkTeacher&&!subjOpts.length?'-- Teacher has no qualified subjects --':'-- Select Subject --'},...subjOpts]} onChange={setBulkSubj}/></div>
-        <div className="field" style={{margin:0}}><label>Teacher</label><SearchSelect value={bulkTeacher} options={[{value:'',label:'-- Select Teacher --'},...teacherOpts]} onChange={setBulkTeacher}/></div>
+        <div className="field" style={{margin:0}}><label>Teacher{(bulkSubj||bulkClasses.length)?' (filtered)':''}</label><SearchSelect value={bulkTeacher} options={[{value:'',label:bulkSubj&&!teacherOpts.length?'-- No teacher matches subject & classes --':'-- Select Teacher --'},...teacherOpts]} onChange={setBulkTeacher}/></div>
       </div>
       {selectedTeacher&&(
         <div style={{padding:'10px 12px',marginBottom:12,borderRadius:6,background:'var(--bg)',border:'1px solid var(--line-soft)',fontSize:12,color:'var(--ink-soft)'}}>
@@ -1222,7 +1278,7 @@ function AllocatePage({data,update}){
           </div>
           <div style={{display:'flex',flexWrap:'wrap',gap:6,alignItems:'center'}}>
             <span style={{fontSize:11,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--ink-muted)',minWidth:80}}>Classes:</span>
-            {teacherClassChips.length?teacherClassChips.map(c=>(<span key={c.id} className="chip">{c.name}</span>)):<span style={{fontStyle:'italic',color:'var(--ink-muted)'}}>none set — all classes available</span>}
+            {teacherClassChips.length?sortClasses(teacherClassChips).map(c=>(<span key={c.id} className="chip">{c.name}</span>)):<span style={{fontStyle:'italic',color:'var(--ink-muted)'}}>none set — all classes available</span>}
           </div>
         </div>
       )}
@@ -1234,15 +1290,29 @@ function AllocatePage({data,update}){
       </div>
       <button className="btn btn-success" onClick={bulkAssign} disabled={!bulkSubj||!bulkTeacher||!bulkClasses.length}>Assign to {bulkClasses.length} class{bulkClasses.length!==1?'es':''}</button>
     </div>
-    <div className="card" style={{padding:0,overflow:'auto'}}><table><thead><tr><th style={{position:'sticky',left:0,background:'var(--paper)',zIndex:2}}>Class</th>
-      {visibleSubjects.map(s=>(<th key={s.id} style={{minWidth:100}}><span className="chip" style={{background:s.color+'22',color:s.color}}>{s.code}</span></th>))}</tr></thead>
-      <tbody>{data.classes.map(c=>{const applicable=getSubjectsForClass(c);return(<tr key={c.id}><td style={{position:'sticky',left:0,background:'var(--paper)',fontWeight:600,zIndex:1,fontSize:12}}>{c.name}</td>
-        {visibleSubjects.map(s=>{
-          if(!applicable.find(x=>x.id===s.id)) return<td key={s.id} style={{background:'var(--line-soft)',textAlign:'center',color:'var(--ink-muted)',fontSize:11}}>–</td>;
-          const tId=data.allocations[allocKey(c.id,s.id)];const eligible=data.teachers.filter(t=>!t.subjects||!t.subjects.length||t.subjects.includes(s.id));
-          const opts=[{value:'',label:'--'},...eligible.map(t=>({value:t.id,label:t.code}))];
-          return<td key={s.id}><SearchSelect value={tId||''} options={opts} onChange={v=>setA(c.id,s.id,v)} style={{minWidth:80}}/></td>;
-        })}</tr>);})}</tbody></table></div>
+    <div className="card" style={{padding:0,overflow:'auto'}}><table><thead><tr>
+      <th style={{position:'sticky',left:0,background:'var(--paper)',zIndex:2}}>Class</th>
+      <th style={{position:'sticky',left:0,background:'var(--paper)',zIndex:2,textAlign:'center'}}>Group</th>
+      <th style={{textAlign:'center'}}>Allocated</th>
+      {visibleSubjects.map(s=>(<th key={s.id} style={{minWidth:100}}><span className="chip" style={{background:s.color+'22',color:s.color}}>{s.code}</span></th>))}
+    </tr></thead>
+      <tbody>{sortedAllClasses.map(c=>{
+        const applicable=getSubjectsForClass(c);
+        const applicableIds=new Set(applicable.map(s=>s.id));
+        const allocatedCount=visibleSubjects.filter(s=>applicableIds.has(s.id)&&data.allocations[allocKey(c.id,s.id)]).length;
+        const applicableCount=visibleSubjects.filter(s=>applicableIds.has(s.id)).length;
+        return(<tr key={c.id}>
+          <td style={{position:'sticky',left:0,background:'var(--paper)',fontWeight:600,zIndex:1,fontSize:12}}>{c.name}</td>
+          <td style={{textAlign:'center',fontSize:11}}><span className={`badge ${c.group==='preprimary'?'':c.group==='primary'?'badge-ok':'badge-warn'}`}>{c.group==='preprimary'?'PRE':c.group==='primary'?'PRI':'UPR'}</span></td>
+          <td style={{textAlign:'center',fontSize:12}}><span className={`badge ${allocatedCount===applicableCount?'badge-ok':allocatedCount?'':'badge-warn'}`}>{allocatedCount}/{applicableCount}</span></td>
+          {visibleSubjects.map(s=>{
+            if(!applicableIds.has(s.id)) return<td key={s.id} style={{background:'var(--line-soft)',textAlign:'center',color:'var(--ink-muted)',fontSize:11}}>–</td>;
+            const tId=data.allocations[allocKey(c.id,s.id)];const eligible=data.teachers.filter(t=>!t.subjects||!t.subjects.length||t.subjects.includes(s.id));
+            const opts=[{value:'',label:'--'},...eligible.map(t=>({value:t.id,label:t.code}))];
+            return<td key={s.id}><SearchSelect value={tId||''} options={opts} onChange={v=>setA(c.id,s.id,v)} style={{minWidth:80}}/></td>;
+          })}
+        </tr>);
+      })}</tbody></table></div>
   </div>);
 }
 
@@ -1399,7 +1469,7 @@ function TimetablePage({data,update}){
     if(skipped>0) alert(skipped+' slot(s) had all teachers busy — placed subject without teacher. Review manually.');
   };
 
-  const clsOpts=data.classes.map(c=>({value:c.id,label:c.name+' ('+(c.group==='preprimary'?'Pre-Pri':c.group==='upper'?'Upper':'Primary')+')'}));
+  const clsOpts=sortClasses(data.classes).map(c=>({value:c.id,label:c.name+' ('+(c.group==='preprimary'?'Pre-Pri':c.group==='upper'?'Upper':'Primary')+')'}));
   // Export flattens across categories — one table row per (category, period) combination.
   const visibleIndices=showingAll?TB_DAYS.map((_,i)=>i):dayFilter.slice();
   const catDaysInView={};
@@ -1449,14 +1519,26 @@ function TimetablePage({data,update}){
       {cls&&<span className={`badge ${cls.group==='preprimary'?'':cls.group==='primary'?'badge-ok':'badge-warn'}`}>{cls.group==='preprimary'?'PRE-PRIMARY':cls.group==='primary'?'PRIMARY':'UPPER'}</span>}
       <span style={{color:'var(--ink-muted)',fontSize:12.5}}>{Object.values(data.timetable[classId]||{}).reduce((s,d)=>s+Object.keys(d).length,0)}/{tSlotsTotal} slots</span>
     </div>
+    {(()=>{const weekdayIdxs=TB_DAYS.map((d,i)=>[d,i]).filter(([d])=>getCategoryForDay(data.school,d)==='weekdays').map(([,i])=>i);
+      const activityIdxs=TB_DAYS.map((d,i)=>[d,i]).filter(([d])=>getCategoryForDay(data.school,d)==='activity').map(([,i])=>i);
+      const baglessIdxs=TB_DAYS.map((d,i)=>[d,i]).filter(([d])=>getCategoryForDay(data.school,d)==='bagless').map(([,i])=>i);
+      const eqSet=(a,b)=>a.length===b.length&&a.every(x=>b.includes(x));
+      const onWeekdays=!showingAll&&eqSet(dayFilter,weekdayIdxs);
+      const onActivity=!showingAll&&eqSet(dayFilter,activityIdxs);
+      const onBagless=!showingAll&&eqSet(dayFilter,baglessIdxs);
+      return(
     <div className="tt-toolbar no-print" style={{marginTop:-4}}>
       <span style={{fontSize:11,fontWeight:500,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.1em'}}>View:</span>
       <div className="tab-bar" style={{flexWrap:'wrap'}}>
         <button className={`tab-btn ${showingAll?'active':''}`} onClick={selectAllDays}>All Days</button>
-        {TB_DAYS.map((d,i)=>(<button key={d} className={`tab-btn ${!showingAll&&dayFilter.includes(i)?'active':''}`} onClick={()=>toggleDay(i)}>{d.slice(0,3)}</button>))}
+        <button className={`tab-btn ${onWeekdays?'active':''}`} disabled={!weekdayIdxs.length} onClick={()=>setDayFilter(weekdayIdxs)}>Weekdays{weekdayIdxs.length?' ('+weekdayIdxs.length+')':''}</button>
+        <button className={`tab-btn ${onActivity?'active':''}`} disabled={!activityIdxs.length} onClick={()=>setDayFilter(activityIdxs)}>Activity Days{activityIdxs.length?' ('+activityIdxs.length+')':''}</button>
+        {baglessIdxs.length>0&&<button className={`tab-btn ${onBagless?'active':''}`} onClick={()=>setDayFilter(baglessIdxs)}>Bag Less ({baglessIdxs.length})</button>}
       </div>
       <span style={{fontSize:11,color:'var(--ink-muted)'}}>{showingAll?'All '+TB_DAYS.length+' days':dayFilter.length+' of '+TB_DAYS.length+' days'}</span>
     </div>
+      );
+    })()}
     {orderedCats.length===0&&<div className="card"><div className="empty-state"><h3 className="serif">No days visible</h3><p>Toggle a day above to see its grid.</p></div></div>}
     {orderedCats.map(cat=>{
       const{dayIdxs,periods}=catDaysInView[cat];
@@ -1511,27 +1593,29 @@ function Picker({data,dayNames,classId,picker,pList,onClose,onPick}){
 function LoadPage({data}){
   const priT=getTeachingCount(data.school.primaryPeriods);const upT=getTeachingCount(data.school.upperPeriods||data.school.primaryPeriods);
   const loads=useMemo(()=>data.teachers.map(t=>({teacher:t,...teacherLoad(t,data.timetable,data.classes,data.school)})),[data]);
-  const[selTeacher,setSelTeacher]=useState('');const[view,setView]=useState('weekly');
+  const[selTeacher,setSelTeacher]=useState('');
+  const[view,setView]=useState('week'); // day | week | month | session | year
+  const[dayIdx,setDayIdx]=useState(0);
+  const[sessionPreview,setSessionPreview]=useState(data.school.activeSession||'normal');
+  const ptRef=React.useRef(null);
   if(!data.teachers.length)return<div><div className="pagehead"><div><h1 className="serif"><em>Teacher Load</em></h1></div></div><div className="card"><div className="empty-state"><h3>No faculty</h3></div></div></div>;
   const sorted=[...loads].sort((a,b)=>b.total-a.total);const over=loads.filter(l=>l.total>l.teacher.maxPeriods).length;const avg=loads.length?Math.round(loads.reduce((s,l)=>s+l.total,0)/loads.length):0;
-  // Subject-wise with duration
+  const openTeacher=tId=>{setSelTeacher(tId);if(ptRef.current)ptRef.current.scrollIntoView({behavior:'smooth',block:'start'});};
   const getSubjDuration=(load)=>{
     return Object.entries(load.bySubject).map(([sId,count])=>{
       const s=data.subjects.find(x=>x.id===sId);if(!s)return null;
-      // Avg period duration from all class grids
       let totalDur=0,cnt=0;
       data.classes.forEach(cls=>{const pl=getPeriodsForClass(data.school,cls);pl.filter(p=>!isNonTeaching(p)).forEach(p=>{totalDur+=(p.duration||35);cnt++;});});
       const avgDur=cnt?Math.round(totalDur/cnt):35;
       return{code:s.code,name:s.name,color:s.color,count,duration:count*avgDur};
     }).filter(Boolean);
   };
-  // Personal timetable for selected teacher
   const selT=data.teachers.find(t=>t.id===selTeacher);
   const tOpts=[{value:'',label:'-- Select Teacher --'},...data.teachers.map(t=>({value:t.id,label:t.code+' – '+t.name}))];
   const ldExpH=['Code','Name','Total','Max','Status','Subjects (count × min)','Classes'];
   const ldExpR=sorted.map(l=>[l.teacher.code,l.teacher.name,l.total,l.teacher.maxPeriods,l.total>l.teacher.maxPeriods?'OVER':'OK',getSubjDuration(l).map(s=>s.code+': '+s.count+'×'+(s.duration/s.count)+'m='+s.duration+'m').join(', '),Object.entries(l.byClass).map(([cId,n])=>{const c=data.classes.find(x=>x.id===cId);return c?c.name+'·'+n:'';}).join(', ')]);
   return(<div>
-    <div className="pagehead"><div><h1 className="serif">Teacher <em>Workload</em></h1></div>
+    <div className="pagehead"><div><h1 className="serif">Teacher <em>Workload</em></h1><div className="sub">Click any teacher row to open their personal timetable below — Day / Week / Month / Session / Academic Year views.</div></div>
       <ExportBar title="Teacher Workload" headers={ldExpH} rows={ldExpR}/>
     </div>
     <div className="grid-4" style={{marginBottom:24}}>
@@ -1543,46 +1627,115 @@ function LoadPage({data}){
     <div className="card"><div className="card-title">Distribution with Duration</div>
       {sorted.map(l=>{const pct=(l.total/l.teacher.maxPeriods)*100;const cls2=pct>100?'over':pct>=85?'full':pct>=50?'':'warn';const st=pct>100?'OVER':pct>=85?'FULL':pct>=50?'OK':'LOW';const sb=pct>100?'badge-err':pct>=85?'badge-ok':pct>=50?'':'badge-warn';
         const subjDur=getSubjDuration(l);
-        return<div key={l.teacher.id} style={{marginBottom:16,paddingBottom:12,borderBottom:'1px solid var(--line-soft)'}}>
+        const isSel=selTeacher===l.teacher.id;
+        return<div key={l.teacher.id} onClick={()=>openTeacher(l.teacher.id)} style={{marginBottom:16,paddingBottom:12,borderBottom:'1px solid var(--line-soft)',cursor:'pointer',padding:'8px 10px',borderRadius:6,background:isSel?'rgba(13,79,60,0.06)':'transparent',transition:'background .12s'}}>
           <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:4}}><div><span style={{fontWeight:600}}>{l.teacher.name}</span><span className="mono" style={{color:'var(--ink-muted)',marginLeft:8,fontSize:12}}>{l.teacher.code}</span>{l.teacher.teacherType!=='regular'&&<span className="badge" style={{marginLeft:6}}>{l.teacher.teacherType==='lecture_based'?'LEC':'ACT'}</span>}</div><div style={{display:'flex',alignItems:'center',gap:12}}><span className="mono" style={{fontSize:13}}>{l.total}/{l.teacher.maxPeriods}</span><span className={`badge ${sb}`}>{st}</span></div></div>
           <div className="load-bar"><div className={`load-fill ${cls2}`} style={{width:Math.min(pct,100)+'%'}}></div></div>
           {subjDur.length>0&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}}>{subjDur.map(sd=>(<span key={sd.code} className="chip" style={{background:sd.color+'18',color:sd.color,fontSize:11}}><span className="chip-color" style={{background:sd.color}}></span>{sd.code}: {sd.count} × {Math.round(sd.duration/sd.count)}m = {sd.duration}m</span>))}</div>}
         </div>;
       })}
     </div>
-    <div className="card">
+    <div className="card" ref={ptRef}>
       <div className="card-title">Personal Timetable</div>
       <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:16,flexWrap:'wrap'}}>
         <SearchSelect value={selTeacher} options={tOpts} onChange={setSelTeacher} style={{minWidth:260}}/>
-        <div className="tab-bar"><button className={`tab-btn ${view==='daily'?'active':''}`} onClick={()=>setView('daily')}>Daily</button><button className={`tab-btn ${view==='weekly'?'active':''}`} onClick={()=>setView('weekly')}>Weekly</button></div>
+        <div className="tab-bar">
+          <button className={`tab-btn ${view==='day'?'active':''}`} onClick={()=>setView('day')}>Day</button>
+          <button className={`tab-btn ${view==='week'?'active':''}`} onClick={()=>setView('week')}>Week</button>
+          <button className={`tab-btn ${view==='month'?'active':''}`} onClick={()=>setView('month')}>Month</button>
+          <button className={`tab-btn ${view==='session'?'active':''}`} onClick={()=>setView('session')}>Session</button>
+          <button className={`tab-btn ${view==='year'?'active':''}`} onClick={()=>setView('year')}>Academic Year</button>
+        </div>
+        {view==='day'&&<SearchSelect value={String(dayIdx)} options={(data.school.days||[]).map((d,i)=>({value:String(i),label:d}))} onChange={v=>setDayIdx(Number(v))} style={{minWidth:140}}/>}
+        {view==='session'&&<SearchSelect value={sessionPreview} options={Object.entries(SESSION_PRESETS).map(([k,pr])=>({value:k,label:pr.label}))} onChange={setSessionPreview} style={{minWidth:140}}/>}
       </div>
       {selT?(()=>{
-        if(view==='daily'){
-          return data.school.days.map((day,dIdx)=>{
-            const sched=getTeacherScheduleForDay(selT.id,dIdx,data.timetable,data.classes,data.school);
-            if(!sched.length)return<div key={dIdx} style={{marginBottom:8,color:'var(--ink-muted)',fontSize:13}}><strong>{day}</strong>: Free</div>;
-            return<div key={dIdx} style={{marginBottom:12}}><div style={{fontWeight:600,marginBottom:4}}>{day} ({sched.length} periods)</div>
-              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{sched.map((sl,i)=>{const subj=data.subjects.find(s=>s.id===sl.subjectId);return<span key={i} className="chip" style={{background:subj?subj.color+'18':'',color:subj?subj.color:''}}>{sl.start}–{sl.end} | {sl.className} | {subj?subj.code:'?'}</span>;})}</div>
-            </div>;
-          });
+        // Weekly totals helpers
+        const schedByDay=(data.school.days||[]).map((_,di)=>getTeacherScheduleForDay(selT.id,di,data.timetable,data.classes,data.school));
+        const weekCount=schedByDay.reduce((s,a)=>s+a.length,0);
+        const weekMins=schedByDay.reduce((s,a)=>s+a.reduce((ss,sl)=>ss+(timeDiff(sl.start,sl.end)),0),0);
+        if(view==='day'){
+          const day=(data.school.days||[])[dayIdx]||'Day';
+          const sched=schedByDay[dayIdx]||[];
+          return<div>
+            <div style={{fontSize:13,color:'var(--ink-soft)',marginBottom:10}}><strong>{day}</strong> — {sched.length} period(s), {sched.reduce((s,sl)=>s+timeDiff(sl.start,sl.end),0)} min</div>
+            {sched.length===0?<div style={{color:'var(--ink-muted)',fontStyle:'italic'}}>Free day.</div>:
+            <table><thead><tr><th>Time</th><th>Period</th><th>Class</th><th>Subject</th></tr></thead><tbody>
+              {sched.map((sl,i)=>{const subj=data.subjects.find(s=>s.id===sl.subjectId);return(<tr key={i}><td className="mono" style={{fontSize:12}}>{sl.start}–{sl.end}</td><td style={{fontSize:12}}>{sl.name}</td><td style={{fontSize:12,fontWeight:600}}>{sl.className}</td><td>{subj?<span className="chip" style={{background:subj.color+'22',color:subj.color}}><span className="chip-color" style={{background:subj.color}}></span>{subj.code} · {subj.name}</span>:'—'}</td></tr>);})}
+            </tbody></table>}
+          </div>;
         }
-        // Weekly grid view
-        const allPeriodSets=data.classes.map(c=>getPeriodsForClass(data.school,c));
-        const maxPeriods=Math.max(...allPeriodSets.map(p=>p.length));
-        return<div style={{overflowX:'auto'}}><table><thead><tr><th>Period</th>{data.school.days.map(d=><th key={d}>{d.slice(0,3)}</th>)}</tr></thead><tbody>
-          {Array.from({length:maxPeriods}).map((_,pi)=>(<tr key={pi}><td className="mono" style={{fontSize:12,color:'var(--ink-muted)'}}>{pi+1}</td>
-            {data.school.days.map((d,di)=>{
-              const sched=getTeacherScheduleForDay(selT.id,di,data.timetable,data.classes,data.school);
-              const slot=sched.find(s=>s.periodIdx===pi);
-              if(!slot)return<td key={di} style={{color:'var(--ink-muted)',fontSize:12}}>–</td>;
-              const subj=data.subjects.find(s=>s.id===slot.subjectId);
-              return<td key={di} style={{fontSize:12,background:subj?subj.color+'10':''}}><strong>{subj?subj.code:'?'}</strong><br/><span style={{fontSize:10,color:'var(--ink-muted)'}}>{slot.className}</span></td>;
-            })}</tr>))}
-        </tbody></table></div>;
-      })():<div style={{color:'var(--ink-muted)',fontStyle:'italic',padding:'12px 0'}}>Select a teacher to view their personal timetable.</div>}
+        if(view==='week'){
+          const allPeriodSets=data.classes.map(c=>getPeriodsForClass(data.school,c));
+          const maxPeriods=Math.max(...allPeriodSets.map(p=>p.length),1);
+          return<div style={{overflowX:'auto'}}>
+            <div style={{fontSize:13,color:'var(--ink-soft)',marginBottom:10}}>Week total: <strong>{weekCount}</strong> periods · <strong>{weekMins}</strong> min ({Math.floor(weekMins/60)}h {weekMins%60}m)</div>
+            <table><thead><tr><th>Period</th>{(data.school.days||[]).map(d=><th key={d}>{d.slice(0,3)}</th>)}</tr></thead><tbody>
+              {Array.from({length:maxPeriods}).map((_,pi)=>(<tr key={pi}><td className="mono" style={{fontSize:12,color:'var(--ink-muted)'}}>{pi+1}</td>
+                {(data.school.days||[]).map((d,di)=>{const slot=(schedByDay[di]||[]).find(s=>s.periodIdx===pi);if(!slot)return<td key={di} style={{color:'var(--ink-muted)',fontSize:12}}>–</td>;const subj=data.subjects.find(s=>s.id===slot.subjectId);return<td key={di} style={{fontSize:12,background:subj?subj.color+'10':''}}><strong>{subj?subj.code:'?'}</strong><br/><span style={{fontSize:10,color:'var(--ink-muted)'}}>{slot.className}</span></td>;})}
+              </tr>))}
+            </tbody></table>
+          </div>;
+        }
+        if(view==='month'){
+          const weeksInMonth=4;const monthCount=weekCount*weeksInMonth;const monthMins=weekMins*weeksInMonth;
+          const bySubject={};schedByDay.forEach(arr=>arr.forEach(sl=>{bySubject[sl.subjectId]=(bySubject[sl.subjectId]||0)+1;}));
+          return<div>
+            <div className="grid-3" style={{marginBottom:12}}>
+              <div className="stat"><div className="label">Periods / week</div><div className="val">{weekCount}</div></div>
+              <div className="stat"><div className="label">Periods / month</div><div className="val">{monthCount}</div><div className="delta">~ {weeksInMonth} weeks</div></div>
+              <div className="stat"><div className="label">Hours / month</div><div className="val">{Math.floor(monthMins/60)}h {monthMins%60}m</div></div>
+            </div>
+            <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>By Subject (per month)</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{Object.entries(bySubject).map(([sId,n])=>{const s=data.subjects.find(x=>x.id===sId);if(!s)return null;return<span key={sId} className="chip" style={{background:s.color+'18',color:s.color}}><span className="chip-color" style={{background:s.color}}></span>{s.code}: {n*weeksInMonth}</span>;})}</div>
+            <div style={{fontSize:11,color:'var(--ink-muted)',marginTop:10,fontStyle:'italic'}}>Estimated from 4 teaching weeks per month. Actual monthly count varies with holidays.</div>
+          </div>;
+        }
+        if(view==='session'){
+          const pr=SESSION_PRESETS[sessionPreview];
+          if(!pr)return<div className="empty-state">Unknown session.</div>;
+          const priP=buildSessionPeriods(pr.primary);const upP=buildSessionPeriods(pr.upper);const prP=buildSessionPeriods(pr.preprimary);
+          const teachPri=priP.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
+          const teachUp=upP.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
+          const teachPre=prP.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
+          return<div>
+            <div style={{fontSize:13,color:'var(--ink-soft)',marginBottom:12}}>Previewing how the periods are structured in <strong>{pr.label}</strong> ({pr.months}) — current assignments in the grid are kept. Period timings below reflect the session template.</div>
+            <div className="grid-3" style={{marginBottom:14}}>
+              <div className="stat"><div className="label">Primary teaching/day</div><div className="val">{teachPri}<span style={{fontSize:14}}> min</span></div></div>
+              <div className="stat"><div className="label">Upper teaching/day</div><div className="val">{teachUp}<span style={{fontSize:14}}> min</span></div></div>
+              <div className="stat"><div className="label">Pre-Pri teaching/day</div><div className="val">{teachPre}<span style={{fontSize:14}}> min</span></div></div>
+            </div>
+            <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Weekly assignments for this teacher</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+              {(data.school.days||[]).map((d,di)=>{const sc=schedByDay[di]||[];return<div key={d} style={{border:'1px solid var(--line)',borderRadius:6,padding:'8px 10px',minWidth:130}}><div style={{fontWeight:600,fontSize:12,marginBottom:4}}>{d.slice(0,3)} · {sc.length}</div>{sc.length?sc.map((sl,i)=>{const subj=data.subjects.find(s=>s.id===sl.subjectId);return<div key={i} style={{fontSize:11,color:'var(--ink-soft)'}}>{sl.start}–{sl.end} {subj?subj.code:'?'}</div>;}):<div style={{fontSize:11,color:'var(--ink-muted)',fontStyle:'italic'}}>free</div>}</div>;})}
+            </div>
+          </div>;
+        }
+        if(view==='year'){
+          const weeksPerYear=38;const yrPeriods=weekCount*weeksPerYear;const yrMins=weekMins*weeksPerYear;
+          const bySubj={};schedByDay.forEach(arr=>arr.forEach(sl=>{bySubj[sl.subjectId]=(bySubj[sl.subjectId]||0)+1;}));
+          const byClass={};schedByDay.forEach(arr=>arr.forEach(sl=>{byClass[sl.classId]=(byClass[sl.classId]||0)+1;}));
+          return<div>
+            <div className="grid-4" style={{marginBottom:14}}>
+              <div className="stat"><div className="label">Periods / year</div><div className="val">{yrPeriods}</div><div className="delta">~ {weeksPerYear} teaching weeks</div></div>
+              <div className="stat"><div className="label">Hours / year</div><div className="val">{Math.floor(yrMins/60)}<span style={{fontSize:14}}> hrs</span></div></div>
+              <div className="stat"><div className="label">Subjects</div><div className="val">{Object.keys(bySubj).length}</div></div>
+              <div className="stat"><div className="label">Classes</div><div className="val">{Object.keys(byClass).length}</div></div>
+            </div>
+            <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>By Subject (yearly periods)</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:14}}>{Object.entries(bySubj).map(([sId,n])=>{const s=data.subjects.find(x=>x.id===sId);if(!s)return null;return<span key={sId} className="chip" style={{background:s.color+'18',color:s.color}}><span className="chip-color" style={{background:s.color}}></span>{s.code}: {n*weeksPerYear}</span>;})}</div>
+            <div style={{fontSize:11,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>By Class (yearly periods)</div>
+            <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{sortClasses(Object.entries(byClass).map(([cId,n])=>({cId,n,...(data.classes.find(x=>x.id===cId)||{})}))).map(x=>(<span key={x.cId} className="chip">{x.name||'?'}: {x.n*weeksPerYear}</span>))}</div>
+            <div style={{fontSize:11,color:'var(--ink-muted)',marginTop:10,fontStyle:'italic'}}>Academic-year estimate assumes {weeksPerYear} teaching weeks. Adjust upward if you run extra sessions.</div>
+          </div>;
+        }
+        return null;
+      })():<div style={{color:'var(--ink-muted)',fontStyle:'italic',padding:'12px 0'}}>Click a teacher row above, or pick one here to view their personal timetable.</div>}
     </div>
   </div>);
 }
+// Minute difference between two HH:MM values (used by Personal Timetable totals)
+function timeDiff(a,b){if(!a||!b)return 0;const[ah,am]=a.split(':').map(Number);const[bh,bm]=b.split(':').map(Number);return Math.max(0,(bh*60+bm)-(ah*60+am));}
 
 // ===== Proxy Management =====
 function ProxyPage({data,update}){
