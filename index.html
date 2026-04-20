@@ -1014,6 +1014,7 @@ function AllocatePage({data,update}){
 // ===== Timetable =====
 function TimetablePage({data,update}){
   const[classId,setClassId]=useState(data.classes[0]?data.classes[0].id:'');const[picker,setPicker]=useState(null);
+  const[dayFilter,setDayFilter]=useState('all');
   const conflicts=useMemo(()=>findConflicts(data.timetable,data.classes,data.school),[data.timetable,data.classes,data.school]);
   useEffect(()=>{if(!classId&&data.classes[0])setClassId(data.classes[0].id);},[data.classes,classId]);
 
@@ -1155,10 +1156,20 @@ function TimetablePage({data,update}){
       {cls&&<span className={`badge ${cls.group==='preprimary'?'':cls.group==='primary'?'badge-ok':'badge-warn'}`}>{cls.group==='preprimary'?'PRE-PRIMARY':cls.group==='primary'?'PRIMARY':'UPPER'}</span>}
       <span style={{color:'var(--ink-muted)',fontSize:12.5}}>{Object.values(data.timetable[classId]||{}).reduce((s,d)=>s+Object.keys(d).length,0)}/{tCount*data.school.days.length} slots</span>
     </div>
-    <div className="tt-grid" style={{'--cols':data.school.days.length}}>
-      <div className="tt-row"><div className="tt-cell header">Period</div>{data.school.days.map(d=><div key={d} className="tt-cell header">{d.slice(0,3)}</div>)}</div>
+    <div className="tt-toolbar no-print" style={{marginTop:-4}}>
+      <span style={{fontSize:11,fontWeight:500,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.1em'}}>View:</span>
+      <div className="tab-bar" style={{flexWrap:'wrap'}}>
+        <button className={`tab-btn ${dayFilter==='all'?'active':''}`} onClick={()=>setDayFilter('all')}>All Days</button>
+        {data.school.days.map((d,i)=>(<button key={d} className={`tab-btn ${dayFilter===String(i)?'active':''}`} onClick={()=>setDayFilter(String(i))}>{d.slice(0,3)}</button>))}
+      </div>
+    </div>
+    {(()=>{
+      const visibleIndices=dayFilter==='all'?data.school.days.map((_,i)=>i):(data.school.days[Number(dayFilter)]!==undefined?[Number(dayFilter)]:data.school.days.map((_,i)=>i));
+      return(
+    <div className="tt-grid" style={{'--cols':visibleIndices.length}}>
+      <div className="tt-row"><div className="tt-cell header">Period</div>{visibleIndices.map(di=><div key={di} className="tt-cell header">{data.school.days[di]}</div>)}</div>
       {pList.map((p,pi)=>(<div className="tt-row" key={pi}><div className="tt-cell time"><div style={{fontWeight:600,color:'var(--ink-soft)',fontSize:11}}>{p.name}</div><div>{p.start}–{p.end}</div></div>
-        {data.school.days.map((_,di)=>{
+        {visibleIndices.map(di=>{
           if(p.isBreak)return<div key={di} className="tt-cell break">{p.name}</div>;
           if(p.isAssembly)return<div key={di} className="tt-cell assembly">{p.name}</div>;
           if(p.isOrientation)return<div key={di} className="tt-cell orientation">{p.name}</div>;
@@ -1169,6 +1180,8 @@ function TimetablePage({data,update}){
           return<div key={di} className={`tt-cell ${!cell?'empty':''} ${conClass}`} style={subj?{background:subj.color+'10',borderLeft:`3px solid ${subj.color}`}:{}} onClick={()=>setPicker({d:di,p:pi})}>{cell&&subj?(<><div className="subj"><span className="chip-color" style={{background:subj.color}}></span>{subj.code}</div><div className="teach">{teacher?teacher.code:'--'}</div></>):'+ assign'}</div>;
         })}</div>))}
     </div>
+      );
+    })()}
     {picker&&<Picker data={data} classId={classId} picker={picker} pList={pList} onClose={()=>setPicker(null)} onPick={setCell}/>}
   </div>);
 }
