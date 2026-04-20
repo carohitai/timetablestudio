@@ -194,6 +194,7 @@
 <script type="text/babel">
 const {useState, useEffect, useMemo, useCallback, useRef} = React;
 const STORAGE_KEY = 'tws_timetable_v8';
+const APP_VERSION = 'v1.4.0'; // shown in export footers; bump on notable releases
 const uid = () => Math.random().toString(36).slice(2,9);
 
 const DESIG_OPTIONS = ['Principal','Vice Principal','Supervisor','Asst. Teacher','Sport Teacher','Librarian','PRT','TGT','PGT','Counsellor','Lab Asst.','Other'];
@@ -498,7 +499,15 @@ async function loadData(){
   }
   return JSON.parse(JSON.stringify(DEFAULT_DATA));
 }
-async function saveData(d){try{await store.set(STORAGE_KEY,JSON.stringify(d))}catch(e){}}
+async function saveData(d){
+  try{
+    // Stamp the data with when it was last written so export footers can
+    // show a "Last data update" line. Mutation is safe — data is about to
+    // be serialized anyway.
+    if(d)d._updatedAt=Date.now();
+    await store.set(STORAGE_KEY,JSON.stringify(d));
+  }catch(e){}
+}
 
 // ====== Save/Export/Import ======
 // DDMMYY_HHMM — compact timestamp suitable for filenames (e.g. 200426_1845).
@@ -529,13 +538,88 @@ function saveAsHTMLFile(data){const n=prompt('Save timetable file as:','TWS_Time
 function importJSON(cb){const i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=migrateData(JSON.parse(ev.target.result));if(d.school&&d.classes&&d.teachers)cb(d);else alert('Invalid file.');}catch(e){alert('Parse error.');}};r.readAsText(f);};i.click();}
 
 // ====== Section Export (Print / PDF / Excel / Word) ======
+// Brand colours used across the export templates. Keep in sync with the
+// app's CSS variables so prints feel on-brand.
+const BRAND={accent:'#0d4f3c',accentSoft:'#1a6b54',ink:'#1a1f1c',inkSoft:'#4a544d',inkMuted:'#8a8f88',paper:'#fbf9f3',bg:'#f6f3ec',line:'#e3ddcf',warm:'#b8651f'};
+// Pull branding + last-updated timestamp from localStorage so exports always
+// carry the current school logo / name / tagline even across tab reloads.
+function getBranding(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const d=JSON.parse(raw);
+      const school=(d&&d.school)||{};
+      return{
+        logo:school.logo||'',
+        name:school.name||'The World School, ICSE',
+        tagline:school.tagline||'Bhusawal · Kolte Foundation Educational Institution',
+        updatedAt:d._updatedAt||0
+      };
+    }
+  }catch(e){}
+  return{logo:'',name:'The World School, ICSE',tagline:'Bhusawal · Kolte Foundation Educational Institution',updatedAt:0};
+}
+function fmtLongDateTime(ts){try{return new Date(ts||Date.now()).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});}catch(e){return new Date(ts||Date.now()).toISOString();}}
 function buildExportHTML(title, headers, rows, subtitle){
-  const date = new Date().toLocaleDateString('en-IN');
-  let h = '<html><head><meta charset="utf-8"><title>'+title+'</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#1a1f1c}h1{font-size:20px;margin:0 0 4px}h2{font-size:13px;color:#666;font-weight:400;margin:0 0 16px}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#f0f0f0;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;border:1px solid #ccc}td{padding:8px 10px;border:1px solid #ddd;font-size:13px;vertical-align:top}.footer{margin-top:20px;font-size:10px;color:#999;text-align:center}</style></head><body>';
-  h += '<h1>The World School, ICSE – '+title+'</h1><h2>'+(subtitle||'')+' | Generated: '+date+'</h2>';
-  h += '<table><thead><tr>'+headers.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>';
-  rows.forEach(r=>{h+='<tr>'+r.map(c=>'<td>'+(c!=null?c:'')+'</td>').join('')+'</tr>';});
-  h += '</tbody></table><div class="footer">The World School, ICSE – Bhusawal | Kolte Foundation Educational Institution</div></body></html>';
+  const b=getBranding();
+  const now=new Date();
+  const genDate=now.toLocaleString('en-IN',{dateStyle:'long',timeStyle:'short'});
+  const updated=b.updatedAt?fmtLongDateTime(b.updatedAt):'—';
+  const escape=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const css=`
+    @page{size:A4;margin:12mm 14mm}
+    *{box-sizing:border-box}
+    body{font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;color:${BRAND.ink};margin:0;padding:0;background:#fff}
+    .sheet{padding:18px 22px 70px;position:relative}
+    .brand-bar{display:flex;align-items:center;gap:14px;padding:14px 18px;background:${BRAND.accent};color:${BRAND.paper};border-radius:10px 10px 0 0;margin-bottom:0}
+    .brand-bar .logo{width:52px;height:52px;border-radius:8px;background:${BRAND.paper};display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
+    .brand-bar .logo img{width:100%;height:100%;object-fit:contain}
+    .brand-bar .text{flex:1;min-width:0}
+    .brand-bar .school-name{font-size:20px;font-weight:700;letter-spacing:.2px;margin:0;line-height:1.15}
+    .brand-bar .tagline{font-size:11px;opacity:.85;margin-top:2px}
+    .brand-bar .kolte{font-size:10px;letter-spacing:.18em;text-transform:uppercase;opacity:.7;margin-top:4px}
+    .title-strip{background:${BRAND.bg};border-left:5px solid ${BRAND.warm};border-radius:0 0 10px 10px;padding:12px 18px;margin-bottom:16px}
+    .title-strip h1{font-size:17px;margin:0;color:${BRAND.accent};font-weight:600}
+    .title-strip .subtitle{font-size:12px;color:${BRAND.inkSoft};margin-top:3px}
+    .meta-row{display:flex;gap:14px;flex-wrap:wrap;font-size:10.5px;color:${BRAND.inkMuted};margin-bottom:14px;padding:0 2px}
+    .meta-row b{color:${BRAND.inkSoft};font-weight:600}
+    table{width:100%;border-collapse:separate;border-spacing:0;margin-top:4px;font-size:12px}
+    thead th{background:${BRAND.accent};color:${BRAND.paper};text-align:left;padding:9px 10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;font-weight:600;border-right:1px solid ${BRAND.accentSoft}}
+    thead th:last-child{border-right:none}
+    thead th:first-child{border-top-left-radius:6px}
+    thead th:last-child{border-top-right-radius:6px}
+    tbody td{padding:8px 10px;border-bottom:1px solid ${BRAND.line};border-right:1px solid ${BRAND.line};vertical-align:top}
+    tbody td:last-child{border-right:none}
+    tbody tr:nth-child(odd) td{background:${BRAND.paper}}
+    tbody tr:nth-child(even) td{background:#fff}
+    tbody tr:last-child td:first-child{border-bottom-left-radius:6px}
+    tbody tr:last-child td:last-child{border-bottom-right-radius:6px}
+    .footer{position:fixed;bottom:0;left:0;right:0;padding:8px 18px;background:${BRAND.accent};color:${BRAND.paper};display:flex;align-items:center;gap:10px;font-size:9.5px}
+    .footer .flogo{width:22px;height:22px;border-radius:4px;background:rgba(255,255,255,.92);display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}
+    .footer .flogo img{width:100%;height:100%;object-fit:contain}
+    .footer .fmain{flex:1;opacity:.95}
+    .footer .fmeta{text-align:right;opacity:.75;font-size:9px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+    @media print{.footer{position:fixed;bottom:0}}
+    .print-btn{display:inline-block;margin:0 6px 12px 0;padding:7px 12px;background:${BRAND.accent};color:${BRAND.paper};border:none;border-radius:5px;font-size:12px;font-weight:500;cursor:pointer}
+    .print-btn:hover{background:${BRAND.accentSoft}}
+    .tip{font-size:10.5px;color:${BRAND.inkMuted};margin:0 0 12px}
+    @media print{.print-btn,.tip{display:none}}
+  `;
+  const logoHTML=b.logo?`<img src="${b.logo}" alt="logo"/>`:'';
+  const logoPlaceholder=b.logo?'':`<span style="font-size:9px;color:${BRAND.accent};font-weight:700;letter-spacing:.1em">LOGO</span>`;
+  let h='<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+escape(b.name+' — '+title)+'</title><style>'+css+'</style></head><body><div class="sheet">';
+  h+='<button class="print-btn" onclick="window.print()">Print / Save as PDF</button>';
+  h+='<p class="tip">Tip: use your browser\'s Print dialog and pick "Save as PDF" for the best looking export. Colours and logo will be preserved if \"Background graphics\" is enabled.</p>';
+  // Header with logo
+  h+='<div class="brand-bar"><div class="logo">'+logoHTML+logoPlaceholder+'</div><div class="text"><div class="school-name">'+escape(b.name)+'</div><div class="tagline">'+escape(b.tagline)+'</div><div class="kolte">An initiative of the Kolte Foundation Educational Institution</div></div></div>';
+  h+='<div class="title-strip"><h1>'+escape(title)+'</h1>'+(subtitle?'<div class="subtitle">'+escape(subtitle)+'</div>':'')+'</div>';
+  h+='<div class="meta-row"><span><b>Generated:</b> '+escape(genDate)+'</span><span><b>Last data update:</b> '+escape(updated)+'</span><span><b>App:</b> Timetable Studio '+escape(APP_VERSION)+'</span></div>';
+  h+='<table><thead><tr>'+headers.map(c=>'<th>'+escape(c)+'</th>').join('')+'</tr></thead><tbody>';
+  rows.forEach(r=>{h+='<tr>'+r.map(c=>'<td>'+escape(c!=null?c:'')+'</td>').join('')+'</tr>';});
+  h+='</tbody></table>';
+  // Footer with logo + version + last-update
+  h+='<div class="footer"><div class="flogo">'+logoHTML+'</div><div class="fmain">'+escape(b.name)+' · '+escape(b.tagline)+' · <em>An initiative of the Kolte Foundation Educational Institution</em></div><div class="fmeta">Timetable Studio '+escape(APP_VERSION)+' · Updated '+escape(b.updatedAt?fmtLongDateTime(b.updatedAt):genDate)+'</div></div>';
+  h+='</div></body></html>';
   return h;
 }
 
@@ -554,10 +638,37 @@ function doExport(format, title, headers, rows, subtitle){
     return;
   }
   if(format==='excel'){
-    // Excel XML (SpreadsheetML) – opens natively in Excel/Sheets
-    let xml='<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="'+title+'"><Table>';
-    xml+='<Row>'+headers.map(c=>'<Cell><Data ss:Type="String">'+c+'</Data></Cell>').join('')+'</Row>';
-    rows.forEach(r=>{xml+='<Row>'+r.map(c=>'<Cell><Data ss:Type="String">'+(c!=null?String(c).replace(/&/g,'&amp;').replace(/</g,'&lt;'):'')+'</Data></Cell>').join('')+'</Row>';});
+    // Excel XML (SpreadsheetML) with styled header block: school name, tagline,
+    // Kolte Foundation footer, version, generated + last-update stamps.
+    const b=getBranding();
+    const genDate=new Date().toLocaleString('en-IN',{dateStyle:'long',timeStyle:'short'});
+    const updated=b.updatedAt?fmtLongDateTime(b.updatedAt):'—';
+    const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const ns='xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns:html="http://www.w3.org/TR/REC-html40"';
+    const styles='<Styles>'
+      +'<Style ss:ID="BrandBar"><Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="14"/><Interior ss:Color="#0d4f3c" ss:Pattern="Solid"/><Alignment ss:Vertical="Center" ss:WrapText="1"/></Style>'
+      +'<Style ss:ID="BrandSub"><Font ss:Color="#555555" ss:Size="10"/><Interior ss:Color="#f6f3ec" ss:Pattern="Solid"/><Alignment ss:Vertical="Center" ss:WrapText="1"/></Style>'
+      +'<Style ss:ID="TitleStrip"><Font ss:Bold="1" ss:Color="#0d4f3c" ss:Size="12"/><Interior ss:Color="#ebe6da" ss:Pattern="Solid"/></Style>'
+      +'<Style ss:ID="Meta"><Font ss:Color="#4a544d" ss:Italic="1" ss:Size="9"/></Style>'
+      +'<Style ss:ID="HeaderCell"><Font ss:Bold="1" ss:Color="#FFFFFF" ss:Size="10"/><Interior ss:Color="#0d4f3c" ss:Pattern="Solid"/><Alignment ss:Horizontal="Left" ss:Vertical="Center"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#1a6b54"/></Borders></Style>'
+      +'<Style ss:ID="BodyOdd"><Font ss:Size="10"/><Interior ss:Color="#fbf9f3" ss:Pattern="Solid"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3ddcf"/></Borders></Style>'
+      +'<Style ss:ID="BodyEven"><Font ss:Size="10"/><Interior ss:Color="#FFFFFF" ss:Pattern="Solid"/><Borders><Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#e3ddcf"/></Borders></Style>'
+      +'<Style ss:ID="FooterBar"><Font ss:Color="#FFFFFF" ss:Size="9"/><Interior ss:Color="#0d4f3c" ss:Pattern="Solid"/></Style>'
+      +'</Styles>';
+    const mergeCell=(text,style,span)=>'<Cell ss:MergeAcross="'+(span-1)+'" ss:StyleID="'+style+'"><Data ss:Type="String">'+esc(text)+'</Data></Cell>';
+    const span=Math.max(headers.length,4);
+    let xml='<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook '+ns+'>'+styles+'<Worksheet ss:Name="'+esc(title).slice(0,28)+'"><Table>';
+    // Branded header block
+    xml+='<Row ss:Height="32">'+mergeCell(b.name,'BrandBar',span)+'</Row>';
+    xml+='<Row ss:Height="18">'+mergeCell(b.tagline+' · An initiative of the Kolte Foundation Educational Institution','BrandSub',span)+'</Row>';
+    xml+='<Row ss:Height="22">'+mergeCell(title+(subtitle?' — '+subtitle:''),'TitleStrip',span)+'</Row>';
+    xml+='<Row>'+mergeCell('Generated: '+genDate+'   |   Last data update: '+updated+'   |   Timetable Studio '+APP_VERSION,'Meta',span)+'</Row>';
+    xml+='<Row/>'; // spacer
+    // Data headers
+    xml+='<Row>'+headers.map(c=>'<Cell ss:StyleID="HeaderCell"><Data ss:Type="String">'+esc(c)+'</Data></Cell>').join('')+'</Row>';
+    rows.forEach((r,i)=>{const style=(i%2===0)?'BodyOdd':'BodyEven';xml+='<Row>'+r.map(c=>'<Cell ss:StyleID="'+style+'"><Data ss:Type="String">'+esc(c!=null?c:'')+'</Data></Cell>').join('')+'</Row>';});
+    xml+='<Row/>'; // spacer
+    xml+='<Row ss:Height="20">'+mergeCell(b.name+' · '+b.tagline+' · Kolte Foundation Educational Institution · '+APP_VERSION,'FooterBar',span)+'</Row>';
     xml+='</Table></Worksheet></Workbook>';
     downloadBlob(new Blob([xml],{type:'application/vnd.ms-excel'}), fn.endsWith('.xls')?fn:fn+'.xls');
     return;
@@ -743,6 +854,84 @@ function App(){
 }
 
 // ===== Dashboard =====
+// ===== User Manual (How-To accordion, shown in Overview) =====
+const HOW_TO=[
+  {cat:'Getting Started',color:'var(--accent)',items:[
+    {q:'How do I set up the school for the first time?',a:['Go to <strong>Day Structure</strong> and upload your logo, fill in the school name + tagline, then pick a Session preset (Summer / Normal / Winter).','Categorise your working days into <em>Weekdays</em> / <em>Activity Days</em> / <em>Bag Less Day</em> and edit the period grid per category + group (Pre-Pri / Primary / Upper).','Move on to <strong>Classes</strong>, <strong>Faculty</strong>, <strong>Subjects</strong>, and <strong>Allocations</strong> in that order.']},
+    {q:'Where is my data saved?',a:['Everything lives in your browser\'s local storage — no account or cloud sign-up needed.','Use the <strong>Save as File</strong> button (sidebar) to download a standalone HTML backup you can reopen on any machine.','If the site is hosted on Vercel with cloud sync configured, the <strong>☁ Cloud Sync</strong> panel lets a whole team share one dataset by passcode.']},
+    {q:'How do I install the app on my phone / desktop?',a:['Open the site in Chrome or Edge. Look for the "Install" icon in the address bar, or go to browser menu → <em>Install app</em> / <em>Add to Home screen</em>.','After install, it runs like a normal app and works offline (PWA).']}
+  ]},
+  {cat:'Day Structure & Periods',color:'var(--accent-soft)',items:[
+    {q:'How do I mark a period as Recess / Break?',a:['In the Period Grid, use the <strong>Type</strong> dropdown on that row and pick "Recess / Break".','Periods whose name starts with Recess, Break, Lunch, Interval, Tiffin, Assembly, Prayer, Orientation, or Homeroom are also auto-detected as non-teaching, so subjects won\'t land there during Auto-fill.']},
+    {q:'Why are Weekdays, Activity, and Bag Less separate?',a:['Many schools have a different schedule on Wed / Sat versus Mon–Fri. The <strong>Category</strong> tab in Day Structure lets you define three fully independent period grids per group so Wednesday can have fewer or shorter periods without breaking the main Monday grid.','Bag Less Day runs on the last day of each month by default (configurable).']},
+    {q:'How do I reorder periods (e.g. move Recess)?',a:['Use the ▲ / ▼ arrows in the Order column of the Period Grid table. Times recalculate automatically from the Start Time you set.']}
+  ]},
+  {cat:'Classes & Faculty',color:'var(--warm)',items:[
+    {q:'How do I add a class / section?',a:['Go to <strong>Classes</strong>, type the section name (e.g. 5C), pick the group (Pre-Pri / Primary / Upper), enter strength, pick a class teacher, and optionally pick a default first-period subject.','Classes are always shown ordered from Nursery → 10, regardless of when they were added.']},
+    {q:'How do I link qualifications to subjects?',a:['Open <strong>Qualification Master</strong>. Each qualification (e.g. B.Ed., M.Sc.) has a Subject Mapping — toggle the subjects that qualification authorises the holder to teach.','When you pick a qualification on a teacher\'s Faculty profile, the mapped subjects flow into their Subjects Qualified chips.']},
+    {q:'How do I change the weekly maximum periods for a teacher?',a:['Faculty → click a row → edit the <strong>Max / wk</strong> field.','Non-principal staff default to 42 periods/week. The cap is enforced by Auto-fill and flagged as OVER in Teacher Load.']}
+  ]},
+  {cat:'Allocations',color:'#0e7490',items:[
+    {q:'Why can\'t I see a particular teacher in the dropdown?',a:['Allocations filters both ways. If you picked a <strong>subject</strong>, the Teacher dropdown only shows teachers qualified for that subject.','If you also picked one or more <strong>classes</strong>, the list narrows further to teachers whose Assigned Classes overlap at least one of those classes.','If the teacher has NO subjects or NO assigned classes set on their Faculty profile, the filter relaxes to include them.']},
+    {q:'How do I assign one teacher to many classes at once?',a:['Use <strong>Bulk Assign</strong> at the top of the Allocations tab. Pick the subject and teacher, toggle the class chips you want, then hit "Assign to N classes".']}
+  ]},
+  {cat:'Building the Timetable',color:'#6d28d9',items:[
+    {q:'How do I auto-fill a class\'s week?',a:['Open <strong>Timetable</strong> → select the class → click <strong>Auto-fill</strong>. The solver respects teacher clashes across classes, the weekly max-periods cap, the default first-subject-of-day, and each day\'s category period grid.','If it can\'t satisfy all constraints it tells you how many slots were placed without a teacher so you can fix them manually.']},
+    {q:'Why does Wednesday show a different period grid than Monday?',a:['Because Wednesday is in the Activity category by default. Timetable Builder renders each day-category as its own sub-grid using that category\'s periods from Day Structure.','Rearrange the category assignment in Day Structure → Working Days → Activity Days.']},
+    {q:'Red dot vs yellow dot on a cell — what\'s the difference?',a:['<span style="color:var(--danger);font-weight:600">Red</span> = the same teacher is already teaching another class at this exact time (teacher clash).','<span style="color:#b45309;font-weight:600">Yellow</span> = the same room is booked for another class at this time (room clash).']}
+  ]},
+  {cat:'Proxy Management',color:'#be185d',items:[
+    {q:'How do I plan a proxy schedule for a given date?',a:['<strong>Proxy Mgmt</strong> → pick the date in the Date picker. The Day dropdown auto-jumps to the correct weekday.','Mark absent teachers → their schedule for that day appears → pick a free substitute from the dropdown for each slot → click <strong>Download PDF</strong> or <strong>Print</strong>.']},
+    {q:'Can I export a consolidated proxy report?',a:['Yes — "Consolidated Report" prints a single sheet listing every proxy assignment for that day with signature lines for the supervisor and HR.']}
+  ]},
+  {cat:'Exports & Printing',color:'#047857',items:[
+    {q:'How do I get a PDF with the school logo?',a:['Every Export button opens a branded print-ready sheet with the school logo in the header, a Kolte Foundation credit, a footer strip with the app version and last-update timestamp, and colour-coded tables.','Use the browser print dialog → "Save as PDF". Ensure <em>Background graphics</em> is enabled so the colours come through.']},
+    {q:'Where is the "last updated" timestamp coming from?',a:['The app records the moment data was last saved (any edit) and shows it on every export header and footer strip.']}
+  ]},
+  {cat:'Backups & Data Safety',color:'#525252',items:[
+    {q:'How do I back up my data?',a:['Sidebar → <strong>Export JSON</strong>. The file name defaults to <code>TWS_DDMMYY_HHMM.json</code>. Keep it on a shared drive or email it to yourself.','The "Save Successfully" toast after Day Structure edits also offers one-click JSON export.']},
+    {q:'How do I move data to another device?',a:['Device A: Export JSON → share the file. Device B: open the site → sidebar → <strong>Import JSON</strong>.','Or use Cloud Sync: same passcode on both devices, Push on A, Pull on B.']},
+    {q:'I made a bad change. Can I undo?',a:['There is no single-click undo — restore the most recent JSON backup via Import JSON.','Get into the habit of exporting JSON after any major change.']}
+  ]}
+];
+function HowToAccordion(){
+  const[openCat,setOpenCat]=useState('Getting Started');
+  const[openItem,setOpenItem]=useState(null);
+  const[query,setQuery]=useState('');
+  const q=query.trim().toLowerCase();
+  const matches=item=>!q||(item.q.toLowerCase().includes(q)||item.a.join(' ').toLowerCase().includes(q));
+  const filtered=HOW_TO.map(g=>({...g,items:g.items.filter(matches)})).filter(g=>g.items.length);
+  const activeCat=q?null:openCat;
+  return(
+    <div className="card">
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap',marginBottom:12}}>
+        <div className="card-title" style={{margin:0}}>User Manual · How to?</div>
+        <input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search the manual…" style={{padding:'7px 12px',border:'1px solid var(--line)',borderRadius:6,fontSize:13,minWidth:220,background:'var(--paper)'}}/>
+      </div>
+      {q&&filtered.length===0&&<div style={{padding:16,color:'var(--ink-muted)',fontStyle:'italic'}}>No entries match "{query}".</div>}
+      <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:10}}>
+        {HOW_TO.map(g=>(<button key={g.cat} onClick={()=>{setOpenCat(g.cat);setOpenItem(null);setQuery('');}} className={`btn btn-sm ${!q&&openCat===g.cat?'btn-primary':'btn-ghost'}`} style={!q&&openCat===g.cat?{background:g.color,borderColor:g.color}:{borderLeft:'3px solid '+g.color}}>{g.cat} ({g.items.length})</button>))}
+      </div>
+      {(q?filtered:HOW_TO.filter(g=>g.cat===activeCat)).map(g=>(
+        <div key={g.cat} style={{marginBottom:14}}>
+          {q&&<div style={{fontSize:11,fontWeight:600,textTransform:'uppercase',letterSpacing:'.08em',color:g.color,marginBottom:6}}>{g.cat}</div>}
+          {g.items.filter(matches).map((it,i)=>{const id=g.cat+'|'+i;const open=openItem===id;return(
+            <div key={i} style={{border:'1px solid var(--line)',borderRadius:8,marginBottom:6,overflow:'hidden',borderLeft:'3px solid '+g.color}}>
+              <button onClick={()=>setOpenItem(open?null:id)} style={{width:'100%',display:'flex',justifyContent:'space-between',alignItems:'center',padding:'11px 14px',background:open?'var(--bg)':'var(--paper)',border:'none',cursor:'pointer',textAlign:'left'}}>
+                <span style={{fontSize:13,fontWeight:600,color:'var(--ink)'}}>{it.q}</span>
+                <span style={{fontSize:14,color:'var(--ink-muted)',marginLeft:10}}>{open?'−':'+'}</span>
+              </button>
+              {open&&<div style={{padding:'2px 16px 14px',borderTop:'1px solid var(--line-soft)',background:'var(--bg)'}}>
+                {it.a.map((line,j)=>(<div key={j} style={{fontSize:13,color:'var(--ink-soft)',lineHeight:1.6,marginTop:10}} dangerouslySetInnerHTML={{__html:line}}/>))}
+              </div>}
+            </div>
+          );})}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Dashboard({data,setTab}){
   const preP=getTeachingCount(data.school.preprimaryPeriods||[])*data.school.days.length;
   const pri=getTeachingCount(data.school.primaryPeriods)*data.school.days.length;
@@ -752,7 +941,7 @@ function Dashboard({data,setTab}){
   const pct=total?Math.round(filled/total*100):0;
   const conflicts=findConflicts(data.timetable,data.classes,data.school);const cc=Object.keys(conflicts).length;
   return(<div>
-    <div className="pagehead"><div><h1 className="serif">A calmer way to plan the <em>week</em>.</h1><div className="sub">Timetable builder with dual Primary/Upper grids, teacher load analysis, and proxy management.</div></div></div>
+    <div className="pagehead"><div><h1 className="serif">A calmer way to plan the <em>week</em>.</h1><div className="sub">Timetable builder with per-category grids, teacher load analysis, and proxy management. Tap a question below to get unstuck fast.</div></div></div>
     <div className="grid-4" style={{marginBottom:24}}>
       <div className="stat"><div className="label">Classes</div><div className="val">{data.classes.length}</div><div className="delta">{data.classes.filter(c=>c.group==='preprimary').length} pre + {data.classes.filter(c=>c.group==='primary').length} pri + {data.classes.filter(c=>c.group==='upper').length} upper</div></div>
       <div className="stat"><div className="label">Faculty</div><div className="val">{data.teachers.length}</div><div className="delta">{data.teachers.filter(t=>t.status==='OLD').length} old + {data.teachers.filter(t=>t.status==='NEW').length} new</div></div>
@@ -766,6 +955,7 @@ function Dashboard({data,setTab}){
         ].map(s=>(<button key={s.t} onClick={()=>setTab(s.t)} style={{textAlign:'left',padding:'14px 16px',border:'1px solid var(--line)',borderRadius:8,background:'var(--bg)',cursor:'pointer'}}><div style={{fontWeight:600,fontSize:13,marginBottom:2}}>{s.l}</div><div style={{fontSize:11.5,color:'var(--ink-soft)'}}>{s.d}</div></button>))}
       </div>
     </div>
+    <HowToAccordion/>
   </div>);
 }
 
