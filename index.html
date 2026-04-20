@@ -1,7 +1,1396 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta charset="UTF-8" /><!DOCTYPE html>
+<html lang="en">
+<head>
 <meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The World School — Timetable Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root{--bg:#f6f3ec;--paper:#fbf9f3;--ink:#1a1f1c;--ink-soft:#4a544d;--ink-muted:#8a8f88;--line:#e3ddcf;--line-soft:#ebe6da;--accent:#0d4f3c;--accent-soft:#1a6b54;--warm:#b8651f;--warm-soft:#d97a26;--danger:#9a2a2a;--danger-soft:#fde2e2}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--ink);font-family:'Geist',-apple-system,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+  body{min-height:100vh}
+  .serif{font-family:'Instrument Serif',Georgia,serif;font-weight:400}
+  .mono{font-family:'Geist Mono',monospace}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+  input,select,textarea{font-family:inherit;font-size:inherit;color:var(--ink)}
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--ink-muted)}
+
+  .app{display:flex;min-height:100vh}
+  .sidebar{width:240px;background:var(--paper);border-right:1px solid var(--line);padding:28px 0;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+  .brand{padding:0 28px 24px;border-bottom:1px solid var(--line)}
+  .brand .mark{font-size:11px;letter-spacing:0.18em;color:var(--ink-muted);text-transform:uppercase;margin-bottom:6px}
+  .brand .name{font-size:24px;line-height:1.1;color:var(--ink)}
+  .brand .name em{font-style:italic;color:var(--accent)}
+  .nav{padding:20px 14px;flex:1}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:10px 14px;border-radius:6px;color:var(--ink-soft);font-size:13.5px;font-weight:500;width:100%;text-align:left;transition:all .15s;margin-bottom:2px}
+  .nav-item:hover{background:var(--line-soft);color:var(--ink)}
+  .nav-item.active{background:var(--ink);color:var(--paper)}
+  .nav-item .num{font-size:11px;color:var(--ink-muted);font-family:'Geist Mono',monospace;width:18px}
+  .nav-item.active .num{color:var(--paper);opacity:.6}
+  .footer-note{padding:16px 28px;font-size:11px;color:var(--ink-muted);border-top:1px solid var(--line);line-height:1.6}
+
+  .main{flex:1;padding:36px 48px 80px;max-width:calc(100vw - 240px);overflow-x:hidden}
+  .pagehead{margin-bottom:32px;display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap}
+  .pagehead h1{font-size:42px;line-height:1.05;color:var(--ink);margin-bottom:6px}
+  .pagehead .sub{color:var(--ink-soft);font-size:14px;max-width:560px}
+  .pagehead .actions{display:flex;gap:8px}
+
+  .btn{padding:9px 16px;border-radius:6px;font-size:13px;font-weight:500;transition:all .15s;border:1px solid transparent;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+  .btn-primary{background:var(--ink);color:var(--paper)}
+  .btn-primary:hover{background:var(--accent)}
+  .btn-ghost{border-color:var(--line);color:var(--ink-soft);background:var(--paper)}
+  .btn-ghost:hover{border-color:var(--ink-muted);color:var(--ink)}
+  .btn-success{background:#065f46;color:var(--paper)}
+  .btn-success:hover{background:#047857}
+  .btn-danger{color:var(--danger);background:transparent}
+  .btn-danger:hover{background:var(--danger-soft)}
+  .btn-sm{padding:6px 11px;font-size:12px}
+  .btn-icon{width:28px;height:28px;padding:0;justify-content:center;border-radius:5px;color:var(--ink-muted)}
+  .btn-icon:hover{background:var(--line-soft);color:var(--ink)}
+
+  .card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:24px;margin-bottom:20px}
+  .card-title{font-size:11px;letter-spacing:0.16em;color:var(--ink-muted);text-transform:uppercase;margin-bottom:14px;font-weight:500}
+  .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+  .grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-muted);font-weight:500;margin-bottom:6px}
+  .field input,.field select,.field textarea{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:6px;background:var(--paper);transition:border .15s}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
+  .row{display:flex;gap:12px;align-items:flex-end}
+  .row .field{flex:1;margin-bottom:0}
+
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-muted);font-weight:500;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--paper)}
+  td{padding:12px 14px;border-bottom:1px solid var(--line-soft);font-size:13.5px;vertical-align:middle}
+  tr:last-child td{border-bottom:none}
+  tr:hover td{background:rgba(13,79,60,0.025)}
+
+  .chip{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:14px;font-size:11.5px;font-weight:500;background:var(--line-soft);color:var(--ink-soft)}
+  .chip-color{width:9px;height:9px;border-radius:50%}
+  .badge{display:inline-block;padding:2px 8px;font-size:10.5px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;border-radius:4px;background:var(--line-soft);color:var(--ink-soft)}
+  .badge-warn{background:#fef3c7;color:#92400e}
+  .badge-ok{background:#d1fae5;color:#065f46}
+  .badge-err{background:var(--danger-soft);color:var(--danger)}
+
+  .tt-toolbar{display:flex;gap:12px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
+  .tt-toolbar select{padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--paper);font-weight:500;min-width:180px}
+  .tt-grid{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--paper)}
+  .tt-row{display:grid;grid-template-columns:90px repeat(var(--cols),1fr);border-bottom:1px solid var(--line-soft)}
+  .tt-row:last-child{border-bottom:none}
+  .tt-cell{padding:10px;border-right:1px solid var(--line-soft);min-height:64px;display:flex;flex-direction:column;justify-content:center;font-size:12.5px;position:relative;cursor:pointer;transition:background .12s}
+  .tt-cell:last-child{border-right:none}
+  .tt-cell:hover{background:rgba(13,79,60,0.04)}
+  .tt-cell.header{background:var(--bg);font-weight:500;color:var(--ink-soft);font-size:11px;letter-spacing:.06em;text-transform:uppercase;cursor:default;text-align:center;padding:14px 8px}
+  .tt-cell.time{background:var(--bg);color:var(--ink-muted);font-family:'Geist Mono',monospace;font-size:10.5px;cursor:default;text-align:center;padding:8px 4px;line-height:1.3}
+  .tt-cell.break{background:repeating-linear-gradient(45deg,var(--line-soft),var(--line-soft) 6px,transparent 6px,transparent 12px);color:var(--ink-muted);font-style:italic;cursor:default;text-align:center;justify-content:center;align-items:center}
+  .tt-cell.assembly{background:rgba(13,79,60,0.08);color:var(--accent);font-weight:500;cursor:default;text-align:center;justify-content:center;align-items:center;font-size:11.5px}
+  .tt-cell.orientation{background:rgba(184,101,31,0.08);color:var(--warm);font-weight:500;cursor:default;text-align:center;justify-content:center;align-items:center;font-size:11.5px}
+  .tt-cell .subj{font-weight:600;font-size:12.5px;line-height:1.2;margin-bottom:2px;display:flex;align-items:center;gap:6px}
+  .tt-cell .teach{font-size:11px;color:var(--ink-muted)}
+  .tt-cell.empty{color:var(--ink-muted);font-style:italic;font-size:11.5px;text-align:center;justify-content:center;align-items:center}
+  .tt-cell.conflict{background:var(--danger-soft) !important}
+  .tt-cell.conflict::before{content:'';position:absolute;top:4px;right:4px;width:6px;height:6px;background:var(--danger);border-radius:50%}
+  .tt-cell.room-conflict{background:#fef3c7 !important}
+  .tt-cell.room-conflict::before{content:'';position:absolute;top:4px;right:4px;width:6px;height:6px;background:#92400e;border-radius:50%}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(26,31,28,0.4);backdrop-filter:blur(4px);z-index:50;display:flex;align-items:center;justify-content:center;padding:20px}
+  .modal{background:var(--paper);border-radius:12px;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.2)}
+  .modal-head{padding:22px 24px;border-bottom:1px solid var(--line)}
+  .modal-head h3{font-size:22px;line-height:1.2}
+  .modal-body{padding:20px 24px;overflow-y:auto}
+  .modal-foot{padding:16px 24px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+
+  .stat{padding:18px 20px;background:var(--paper);border:1px solid var(--line);border-radius:10px}
+  .stat .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-muted);font-weight:500;margin-bottom:8px}
+  .stat .val{font-size:32px;font-family:'Instrument Serif',serif;line-height:1;color:var(--ink)}
+  .stat .delta{font-size:12px;color:var(--ink-soft);margin-top:6px}
+
+  .load-bar{height:6px;background:var(--line-soft);border-radius:3px;overflow:hidden;margin-top:6px}
+  .load-fill{height:100%;background:var(--accent);transition:width .3s}
+  .load-fill.warn{background:var(--warm)}
+  .load-fill.full{background:var(--accent-soft)}
+  .load-fill.over{background:var(--danger)}
+
+  .heat{display:grid;grid-template-columns:80px repeat(var(--periods),1fr);gap:2px;font-size:10px}
+  .heat-cell{padding:6px 4px;text-align:center;border-radius:3px;background:var(--line-soft);min-height:24px;display:flex;align-items:center;justify-content:center}
+  .heat-cell.lvl1{background:#dde7e1}.heat-cell.lvl2{background:#a4c8b9}.heat-cell.lvl3{background:#5ea08a}.heat-cell.lvl4{background:var(--accent);color:var(--paper)}
+  .heat-cell.label{background:transparent;justify-content:flex-start;color:var(--ink-soft);font-weight:500}
+
+  .empty-state{text-align:center;padding:60px 20px;color:var(--ink-muted)}
+  .empty-state h3{font-size:24px;color:var(--ink-soft);margin-bottom:8px}
+  .empty-state p{margin-bottom:16px}
+
+  .tab-bar{display:flex;gap:0;margin-bottom:20px;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:fit-content}
+  .tab-btn{padding:10px 24px;font-size:13px;font-weight:500;background:var(--paper);color:var(--ink-soft);border:none;cursor:pointer;border-right:1px solid var(--line);transition:all .15s}
+  .tab-btn:last-child{border-right:none}
+  .tab-btn:hover{background:var(--bg)}
+  .tab-btn.active{background:var(--ink);color:var(--paper)}
+
+  /* Searchable Select */
+  .ss-wrap{position:relative}
+  .ss-trigger{width:100%;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--paper);cursor:pointer;font-size:13px;text-align:left;display:flex;justify-content:space-between;align-items:center;min-height:38px}
+  .ss-trigger:hover{border-color:var(--ink-muted)}
+  .ss-trigger .ss-arrow{font-size:10px;color:var(--ink-muted)}
+  .ss-drop{position:absolute;top:100%;left:0;right:0;background:var(--paper);border:1px solid var(--line);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,0.12);z-index:40;margin-top:4px;overflow:hidden}
+  .ss-search{width:100%;padding:10px 12px;border:none;border-bottom:1px solid var(--line);font-size:13px;outline:none}
+  .ss-list{max-height:180px;overflow-y:auto}
+  .ss-opt{padding:8px 12px;cursor:pointer;font-size:13px;transition:background .1s}
+  .ss-opt:hover{background:var(--line-soft)}
+  .ss-opt.selected{background:var(--accent);color:var(--paper)}
+
+  /* Avatar */
+  .avatar{width:40px;height:40px;border-radius:50%;background:var(--line-soft);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:var(--ink-muted);overflow:hidden;flex-shrink:0}
+  .avatar img{width:100%;height:100%;object-fit:cover}
+  .avatar-lg{width:72px;height:72px;font-size:22px;cursor:pointer;border:2px dashed var(--line);transition:border-color .15s}
+  .avatar-lg:hover{border-color:var(--accent)}
+
+  /* Proxy */
+  .proxy-cell{padding:8px 10px;border:1px solid var(--line-soft);border-radius:6px;background:var(--paper);min-height:48px}
+  .proxy-cell.assigned{border-color:var(--accent);background:rgba(13,79,60,0.04)}
+  .proxy-slip{background:white;padding:32px;border:1px solid var(--line);border-radius:10px;margin-top:16px}
+
+  @media (max-width:900px){
+    .sidebar{width:64px}
+    .brand,.footer-note,.nav-item span:not(.num){display:none}
+    .nav{padding:20px 8px}
+    .nav-item{justify-content:center}
+    .main{padding:24px;max-width:calc(100vw - 64px)}
+    .pagehead h1{font-size:30px}
+    .grid-3,.grid-4{grid-template-columns:1fr 1fr}
+  }
+  @media print{
+    body{background:white}
+    .sidebar,.pagehead .actions,.tt-toolbar,.no-print{display:none !important}
+    .main{padding:0;max-width:100%}
+    .card{border:1px solid #ccc;page-break-inside:avoid}
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState, useEffect, useMemo, useCallback, useRef} = React;
+const STORAGE_KEY = 'tws_timetable_v8';
+const uid = () => Math.random().toString(36).slice(2,9);
+
+const DESIG_OPTIONS = ['Principal','Vice Principal','Supervisor','Asst. Teacher','Sport Teacher','Librarian','PRT','TGT','PGT','Counsellor','Lab Asst.','Other'];
+
+// Default Qualification Master (user-editable via Qual Master tab)
+const DEFAULT_QUAL_MASTER = [
+  {id:'q1',name:'B.A.',cat:'degree',subjectMap:['s1','s2','s3','s6','s7','s13','s14']},
+  {id:'q2',name:'B.A.(English)',cat:'degree',subjectMap:['s1','s13','s14']},
+  {id:'q3',name:'B.A.(Hindi)',cat:'degree',subjectMap:['s2','s13','s14']},
+  {id:'q4',name:'B.A.(Marathi)',cat:'degree',subjectMap:['s3','s13','s14']},
+  {id:'q5',name:'B.A.(Sanskrit)',cat:'degree',subjectMap:['s13','s14']},
+  {id:'q6',name:'M.A.',cat:'degree',subjectMap:['s1','s2','s3','s6','s7','s13','s14']},
+  {id:'q7',name:'M.A.(English)',cat:'degree',subjectMap:['s1','s13','s14']},
+  {id:'q8',name:'M.A.(Hindi)',cat:'degree',subjectMap:['s2','s13','s14']},
+  {id:'q9',name:'M.A.(Marathi)',cat:'degree',subjectMap:['s3','s13','s14']},
+  {id:'q10',name:'B.Sc.',cat:'degree',subjectMap:['s4','s5','s8']},
+  {id:'q11',name:'M.Sc.',cat:'degree',subjectMap:['s4','s5','s8']},
+  {id:'q12',name:'B.Com.',cat:'degree',subjectMap:['s4','s8']},
+  {id:'q13',name:'M.Com.',cat:'degree',subjectMap:['s4','s8']},
+  {id:'q14',name:'B.C.A.',cat:'degree',subjectMap:['s8']},
+  {id:'q15',name:'M.C.A.',cat:'degree',subjectMap:['s8']},
+  {id:'q16',name:'B.Tech.',cat:'degree',subjectMap:['s4','s5','s8']},
+  {id:'q17',name:'M.Tech.',cat:'degree',subjectMap:['s4','s5','s8']},
+  {id:'q18',name:'B.B.A.',cat:'degree',subjectMap:[]},
+  {id:'q19',name:'M.B.A.',cat:'degree',subjectMap:[]},
+  {id:'q20',name:'B.Arch.',cat:'degree',subjectMap:[]},
+  {id:'q21',name:'LL.B.',cat:'degree',subjectMap:[]},
+  {id:'q22',name:'LL.M.',cat:'degree',subjectMap:[]},
+  {id:'q23',name:'Ph.D.',cat:'degree',subjectMap:[]},
+  {id:'q30',name:'B.Ed.',cat:'professional',subjectMap:[]},
+  {id:'q31',name:'M.Ed.',cat:'professional',subjectMap:[]},
+  {id:'q32',name:'D.El.Ed.',cat:'professional',subjectMap:[]},
+  {id:'q33',name:'D.Ed.',cat:'professional',subjectMap:[]},
+  {id:'q34',name:'B.P.Ed.',cat:'professional',subjectMap:['s10']},
+  {id:'q35',name:'M.P.Ed.',cat:'professional',subjectMap:['s10']},
+  {id:'q36',name:'B.Lib.Sc.',cat:'professional',subjectMap:['s12']},
+  {id:'q37',name:'M.Lib.Sc.',cat:'professional',subjectMap:['s12']},
+  {id:'q38',name:'N.T.T.',cat:'professional',subjectMap:[]},
+  {id:'q39',name:'E.C.C.Ed.',cat:'professional',subjectMap:[]},
+  {id:'q40',name:'CTET',cat:'professional',subjectMap:[]},
+  {id:'q41',name:'MH-TET',cat:'professional',subjectMap:[]},
+];
+
+// subGroup: 'regular' | 'graded' | 'activity'
+// standards: array of grade numbers this subject applies to (empty = all)
+const ICSE_SUBJECTS = [
+  {id:'s1',name:'English',code:'ENG',color:'#1e40af',subGroup:'regular',standards:[]},
+  {id:'s2',name:'Hindi',code:'HIN',color:'#b45309',subGroup:'regular',standards:[]},
+  {id:'s3',name:'Marathi',code:'MAR',color:'#047857',subGroup:'regular',standards:[]},
+  {id:'s4',name:'Mathematics',code:'MAT',color:'#9a2a2a',subGroup:'regular',standards:[]},
+  {id:'s5',name:'EVS',code:'EVS',color:'#6d28d9',subGroup:'regular',standards:[1,2,3,4,5]},
+  {id:'s6',name:'Science',code:'SCI',color:'#6d28d9',subGroup:'regular',standards:[3,4,5]},
+  {id:'s16',name:'Physics',code:'PHY',color:'#7c3aed',subGroup:'regular',standards:[6,7,8,9,10]},
+  {id:'s17',name:'Chemistry',code:'CHE',color:'#a21caf',subGroup:'regular',standards:[6,7,8,9,10]},
+  {id:'s18',name:'Biology',code:'BIO',color:'#15803d',subGroup:'regular',standards:[6,7,8,9,10]},
+  {id:'s19',name:'SST',code:'SST',color:'#be185d',subGroup:'regular',standards:[6,7,8]},
+  {id:'s20',name:'History',code:'HIS',color:'#be185d',subGroup:'regular',standards:[9,10]},
+  {id:'s7',name:'Geography',code:'GEO',color:'#0e7490',subGroup:'regular',standards:[9,10]},
+  {id:'s21',name:'Civics',code:'CIV',color:'#9f1239',subGroup:'regular',standards:[9,10]},
+  {id:'s8',name:'Computer',code:'COM',color:'#0891b2',subGroup:'graded',standards:[]},
+  {id:'s22',name:'Value Education',code:'VE',color:'#d97706',subGroup:'graded',standards:[1,2,3,4,5,6,7,8]},
+  {id:'s14',name:'General Knowledge',code:'GK',color:'#0369a1',subGroup:'graded',standards:[]},
+  {id:'s10',name:'Physical Education',code:'PT',color:'#65a30d',subGroup:'graded',standards:[]},
+  {id:'s9',name:'Drawing / Art',code:'ART',color:'#c2410c',subGroup:'graded',standards:[]},
+  {id:'s23',name:'Craft',code:'CRF',color:'#ea580c',subGroup:'activity',standards:[1,2,3,4,5,6,7,8]},
+  {id:'s24',name:'Outdoor Activity',code:'OA',color:'#16a34a',subGroup:'activity',standards:[1,2,3,4,5,6,7,8]},
+  {id:'s25',name:'Indoor Activity',code:'IA',color:'#2563eb',subGroup:'activity',standards:[1,2,3,4,5,6,7,8]},
+  {id:'s12',name:'Library',code:'LIB',color:'#525252',subGroup:'activity',standards:[]},
+  {id:'s26',name:'MPT',code:'MPT',color:'#7c3aed',subGroup:'activity',standards:[1,2,3,4]},
+  {id:'s15',name:'SUPW',code:'SUPW',color:'#4d7c0f',subGroup:'activity',standards:[5,6,7,8,9,10]},
+  {id:'s27',name:'Scout/Guide',code:'SCT',color:'#854d0e',subGroup:'activity',standards:[5,6,7,8,9]},
+  {id:'s11',name:'Music',code:'MUS',color:'#7c3aed',subGroup:'activity',standards:[]},
+];
+
+// Weekly lecture limits per standard (from TWS lecture limitation chart)
+const LECTURE_LIMITS = {
+  1:{ENG:7,MAT:7,EVS:6,HIN:6,MAR:4,COM:2,VE:2,GK:2,OA:2,IA:2,CRF:1,ART:1,LIB:1,MPT:1,PT:2},
+  2:{ENG:7,MAT:7,EVS:6,HIN:6,MAR:4,COM:2,VE:2,GK:2,OA:2,IA:2,CRF:1,ART:1,LIB:1,MPT:1,PT:2},
+  3:{ENG:6,MAT:6,EVS:6,SCI:5,HIN:5,MAR:3,COM:2,VE:1,GK:2,OA:2,IA:2,CRF:1,ART:1,LIB:1,MPT:1,PT:2},
+  4:{ENG:6,MAT:6,EVS:6,SCI:5,HIN:5,MAR:3,COM:2,VE:1,GK:2,OA:2,IA:2,CRF:1,ART:1,LIB:1,MPT:1,PT:2},
+  5:{ENG:6,MAT:6,EVS:6,SCI:5,HIN:5,MAR:3,COM:2,VE:1,GK:1,OA:2,IA:2,CRF:1,ART:1,LIB:1,PT:2,SUPW:1,SCT:1},
+  6:{ENG:6,MAT:6,PHY:2,CHE:2,BIO:2,SST:5,HIN:5,MAR:3,COM:2,VE:1,GK:1,OA:2,IA:2,CRF:1,ART:1,LIB:1,PT:2,SUPW:1,SCT:1},
+  7:{ENG:6,MAT:6,PHY:2,CHE:2,BIO:2,SST:5,HIN:5,MAR:3,COM:2,VE:1,GK:1,OA:2,IA:2,CRF:1,ART:1,LIB:1,PT:2,SUPW:1,SCT:1},
+  8:{ENG:6,MAT:6,PHY:2,CHE:2,BIO:2,SST:5,HIN:5,MAR:3,COM:2,VE:1,GK:1,OA:2,IA:2,CRF:1,ART:1,LIB:1,PT:2,SUPW:1,SCT:1},
+  9:{ENG:6,MAT:6,PHY:4,CHE:4,BIO:4,HIN:5,HIS:3,GEO:3,CIV:2,PT:4,SUPW:2,MAR:2,SCT:1},
+  10:{ENG:6,MAT:6,PHY:4,CHE:4,BIO:4,HIN:6,HIS:3,GEO:3,CIV:2,PT:4,SUPW:2,MAR:2},
+};
+
+// Teacher type: 'regular' | 'lecture_based' | 'activity'
+const mkTeacher = (id,name,code,desig,status,max,subjs) => ({id,name,code,designation:desig,status,maxPeriods:max,subjects:subjs,qualifications:[],otherCourses:'',photo:'',assignedClasses:[],teacherType:'regular',availFrom:'',availTo:''});
+const DEFAULT_TEACHERS = [
+  mkTeacher('t01','Ms. Patricia C. Hassett','PCH','Principal','OLD',10,[]),
+  mkTeacher('t02','Ms. Jennifer V. Sonawane','JVS','Supervisor','OLD',30,[]),
+  mkTeacher('t03','Mr. Devendra S. Bharambe','DSB','Librarian','OLD',30,['s12']),
+  mkTeacher('t04','Ms. Rajshree A. Awtade','RAA','Asst. Teacher','OLD',35,[]),
+  mkTeacher('t05','Mr. Sumit D. Dasgupta','SDD','Sport Teacher','OLD',35,['s10']),
+  mkTeacher('t06','Ms. Priyanka T. Bhole','PTB','Asst. Teacher','OLD',35,[]),
+  mkTeacher('t07','Ms. Bharati D. Patrick','BDP','Supervisor','OLD',30,[]),
+  mkTeacher('t08','Ms. Yamini N. Warulkar','YNW','Supervisor','OLD',30,[]),
+  mkTeacher('t09','Ms. Jyoti A. Rathod','JAR','Asst. Teacher','OLD',35,[]),
+  mkTeacher('t10','Ms. Laxmi V. Tayade','LVT','Asst. Teacher','OLD',35,[]),
+  mkTeacher('t11','Ms. Sharda R. Saini','SRS','Asst. Teacher','OLD',35,[]),
+  mkTeacher('t12','Ms. Manda S. Talele','MST','Asst. Teacher','OLD',35,[]),
+  mkTeacher('t13','Ms. Ravina R. Ubale','RRU','Asst. Teacher','OLD',35,[]),
+  mkTeacher('t14','Ms. Payal Shukla','PSH','Asst. Teacher','OLD',35,[]),
+  mkTeacher('t15','Ms. Sudha K. Bansode','SKB','Asst. Teacher','OLD',35,[]),
+  mkTeacher('t16','Ms. Priti M. Myakal','PMM','Asst. Teacher','OLD',35,[]),
+  mkTeacher('t17','Ms. Vinita S. Shrivas','VSS','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t18','Ms. Sunita V. Khillare','SVK','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t19','Ms. Deepali P. Wani','DPW','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t20','Ms. Nisha S. Boralkar','NSB','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t21','Ms. Neha Pardeshi','NPA','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t22','Mr. Rajesh R. Surwade','RRS','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t23','Mr. Pravin M. Mehere','PME','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t24','Ms. Shireen A. Khan','SAK','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t25','Ms. Kavita N. Dhangar','KND','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t26','Mr. Devanand A. Joshi','DAJ','Asst. Teacher','NEW',35,[]),
+  mkTeacher('t27','Mr. Shaikh Muzakkir S. Farid','SMF','Asst. Teacher','NEW',35,[]),
+];
+
+const DEFAULT_CLASSES = [
+  {id:'c_n1',name:'Nursery',group:'preprimary',strength:0,classTeacherId:null,grade:0},
+  {id:'c_jk',name:'Jr. KG',group:'preprimary',strength:0,classTeacherId:null,grade:0},
+  {id:'c_sk',name:'Sr. KG',group:'preprimary',strength:0,classTeacherId:null,grade:0},
+  {id:'c01',name:'1A · Shivneri',group:'primary',strength:0,classTeacherId:null,grade:1},
+  {id:'c02',name:'1B · Torna',group:'primary',strength:0,classTeacherId:null,grade:1},
+  {id:'c03',name:'1C · Ajinkyatara',group:'primary',strength:0,classTeacherId:null,grade:1},
+  {id:'c04',name:'2A · Raigad',group:'primary',strength:0,classTeacherId:null,grade:2},
+  {id:'c05',name:'2B · Janjira',group:'primary',strength:0,classTeacherId:null,grade:2},
+  {id:'c06',name:'2C · Kondhana',group:'primary',strength:0,classTeacherId:null,grade:2},
+  {id:'c07',name:'3A · Purandar',group:'primary',strength:0,classTeacherId:null,grade:3},
+  {id:'c08',name:'3B · Sinhagad',group:'primary',strength:0,classTeacherId:null,grade:3},
+  {id:'c09',name:'3C · Korigad',group:'primary',strength:0,classTeacherId:null,grade:3},
+  {id:'c10',name:'4A · Pratapgad',group:'primary',strength:0,classTeacherId:null,grade:4},
+  {id:'c11',name:'4B · Sajjangad',group:'primary',strength:0,classTeacherId:null,grade:4},
+  {id:'c12',name:'5A · Panhalgad',group:'upper',strength:0,classTeacherId:null,grade:5},
+  {id:'c13',name:'5B · Vijandarg',group:'upper',strength:0,classTeacherId:null,grade:5},
+  {id:'c14',name:'6A · Lohgad',group:'upper',strength:0,classTeacherId:null,grade:6},
+  {id:'c15',name:'7A · Sindhudurg',group:'upper',strength:0,classTeacherId:null,grade:7},
+  {id:'c16',name:'7B · Surandurg',group:'upper',strength:0,classTeacherId:null,grade:7},
+  {id:'c17',name:'8 · Ratangad',group:'upper',strength:0,classTeacherId:null,grade:8},
+  {id:'c18',name:'9 · Sangramgad',group:'upper',strength:0,classTeacherId:null,grade:9},
+  {id:'c19',name:'10 · Vishalgad',group:'upper',strength:0,classTeacherId:null,grade:10},
+];
+
+// Duration helper: given a startTime and array of periods with duration, compute start/end
+function calcTimes(startTime, periods){
+  let mins = parseInt(startTime.split(':')[0])*60 + parseInt(startTime.split(':')[1]);
+  return periods.map(p=>{
+    const dur = p.duration || 30;
+    const s = String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+    mins += dur;
+    const e = String(Math.floor(mins/60)).padStart(2,'0')+':'+String(mins%60).padStart(2,'0');
+    return {...p, start:s, end:e};
+  });
+}
+
+const SESSION_PRESETS = {
+  summer:{label:'Summer',months:'April',
+    preprimary:{startTime:'08:00',periods:[{name:'Circle Time',duration:20,isAssembly:true},{name:'I',duration:30},{name:'II',duration:30},{name:'Recess',duration:20,isBreak:true},{name:'III',duration:30},{name:'IV',duration:30}]},
+    primary:{startTime:'08:00',periods:[{name:'Assembly',duration:15,isAssembly:true},{name:'Orientation',duration:45,isOrientation:true},{name:'I',duration:30},{name:'II',duration:30},{name:'III',duration:30},{name:'Recess',duration:30,isBreak:true},{name:'IV',duration:45},{name:'V',duration:45}]},
+    upper:{startTime:'08:00',periods:[{name:'Assembly',duration:15,isAssembly:true},{name:'I',duration:35},{name:'II',duration:35},{name:'III',duration:35},{name:'IV',duration:30},{name:'Recess',duration:30,isBreak:true},{name:'V',duration:45},{name:'VI',duration:45}]}
+  },
+  normal:{label:'Normal',months:'Jun–Nov, Mar',
+    preprimary:{startTime:'08:30',periods:[{name:'Circle Time',duration:25,isAssembly:true},{name:'I',duration:35},{name:'II',duration:35},{name:'Recess',duration:20,isBreak:true},{name:'III',duration:35},{name:'IV',duration:35},{name:'V',duration:30}]},
+    primary:{startTime:'08:00',periods:[{name:'Orientation',duration:30,isOrientation:true},{name:'Assembly',duration:25,isAssembly:true},{name:'I',duration:35},{name:'II',duration:35},{name:'Recess 1',duration:20,isBreak:true},{name:'III',duration:35},{name:'IV',duration:35},{name:'V',duration:35},{name:'VI',duration:15},{name:'Recess 2',duration:10,isBreak:true},{name:'VII',duration:40},{name:'VIII',duration:35}]},
+    upper:{startTime:'08:15',periods:[{name:'I',duration:40},{name:'II',duration:40},{name:'III',duration:40},{name:'IV',duration:40},{name:'Recess 1',duration:20,isBreak:true},{name:'V',duration:40},{name:'VI',duration:40},{name:'Recess 2',duration:10,isBreak:true},{name:'VII',duration:25},{name:'VIII',duration:30}]}
+  },
+  winter:{label:'Winter',months:'Dec–Feb',
+    preprimary:{startTime:'09:00',periods:[{name:'Circle Time',duration:20,isAssembly:true},{name:'I',duration:30},{name:'II',duration:30},{name:'Recess',duration:20,isBreak:true},{name:'III',duration:30},{name:'IV',duration:30},{name:'V',duration:30}]},
+    primary:{startTime:'08:30',periods:[{name:'Assembly',duration:25,isAssembly:true},{name:'I',duration:35},{name:'II',duration:35},{name:'III',duration:20},{name:'Recess 1',duration:20,isBreak:true},{name:'IV',duration:35},{name:'V',duration:35},{name:'VI',duration:35},{name:'Recess 2',duration:10,isBreak:true},{name:'VII',duration:35},{name:'VIII',duration:35}]},
+    upper:{startTime:'08:30',periods:[{name:'I',duration:35},{name:'II',duration:35},{name:'III',duration:35},{name:'IV',duration:35},{name:'V',duration:20},{name:'Recess 1',duration:20,isBreak:true},{name:'VI',duration:35},{name:'VII',duration:35},{name:'Recess 2',duration:10,isBreak:true},{name:'VIII',duration:35},{name:'IX',duration:35}]}
+  }
+};
+
+function buildSessionPeriods(preset){
+  return calcTimes(preset.startTime, preset.periods);
+}
+
+const DEFAULT_DATA = {
+  school:{days:['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'],activeSession:'normal',
+    preprimaryStart:'08:30', primaryStart:'08:00', upperStart:'08:15',
+    preprimaryPeriods:buildSessionPeriods(SESSION_PRESETS.normal.preprimary),
+    primaryPeriods:buildSessionPeriods(SESSION_PRESETS.normal.primary),
+    upperPeriods:buildSessionPeriods(SESSION_PRESETS.normal.upper)},
+  classes:DEFAULT_CLASSES, teachers:DEFAULT_TEACHERS, subjects:ICSE_SUBJECTS, qualMaster:DEFAULT_QUAL_MASTER,
+  lectureLimits:LECTURE_LIMITS,
+  rooms:[{id:'r1',name:'Classroom 1'},{id:'r2',name:'Classroom 2'},{id:'r3',name:'Classroom 3'},{id:'r4',name:'Computer Lab'},{id:'r5',name:'Library'},{id:'r6',name:'Playground'}],
+  allocations:{}, timetable:{}, proxyAssignments:{}
+};
+
+// ====== Storage ======
+const store = {
+  async get(k){if(window.storage&&window.storage.get){try{return await window.storage.get(k)}catch(e){}} try{const v=localStorage.getItem(k);return v?{value:v}:null}catch(e){return null}},
+  async set(k,v){if(window.storage&&window.storage.set){try{await window.storage.set(k,v);return}catch(e){}} try{localStorage.setItem(k,v)}catch(e){}}
+};
+
+function migrateTeachers(teachers, qualMaster){
+  if(!teachers) return teachers;
+  const profList=['B.Ed.','M.Ed.','D.El.Ed.','D.Ed.','B.P.Ed.','M.P.Ed.','B.Lib.Sc.','M.Lib.Sc.','N.T.T.','E.C.C.Ed.','CTET','MH-TET'];
+  const qm = qualMaster || DEFAULT_QUAL_MASTER;
+  return teachers.map(t=>{
+    const b={qualifications:[],otherCourses:'',designation:'Asst. Teacher',status:'OLD',photo:'',assignedClasses:[],...t};
+    // Migrate old single 'degree' field
+    if(t.degree!==undefined&&!t.degreeQual&&!t.profCourse&&!t.qualifications){
+      if(t.degree){
+        const match=qm.find(q=>q.name===t.degree);
+        if(match) b.qualifications=[match.id];
+      }
+    }
+    delete b.degree;
+    // Migrate old degreeQual/profCourse arrays to unified qualifications
+    if((t.degreeQual&&t.degreeQual.length)||(t.profCourse&&t.profCourse.length)){
+      if(!t.qualifications||!t.qualifications.length){
+        const names=[...(t.degreeQual||[]),...(t.profCourse||[])];
+        b.qualifications=names.map(n=>{const m=qm.find(q=>q.name===n);return m?m.id:null;}).filter(Boolean);
+      }
+    }
+    delete b.degreeQual; delete b.profCourse;
+    if(typeof b.qualifications==='undefined') b.qualifications=[];
+    if(!b.assignedClasses) b.assignedClasses=[];
+    return b;
+  });
+}
+
+function migrateData(old){
+  if(old.classes) old.classes=old.classes.map(c=>{
+    const base=c.group?c:{...c,group:c.name.match(/^[1-4]/)?'primary':c.name.match(/nursery|jr|sr|kg/i)?'preprimary':'upper'};
+    if(base.grade===undefined){const m=base.name.match(/^(\d+)/);base.grade=m?parseInt(m[1]):0;}
+    return base;
+  });
+  if(old.school&&old.school.periods&&!old.school.primaryPeriods){old.school.primaryPeriods=old.school.periods;old.school.upperPeriods=old.school.periods;}
+  if(old.school&&!old.school.activeSession) old.school.activeSession='normal';
+  if(old.school&&!old.school.preprimaryPeriods) old.school.preprimaryPeriods=buildSessionPeriods(SESSION_PRESETS.normal.preprimary);
+  if(!old.qualMaster) old.qualMaster=DEFAULT_QUAL_MASTER.map(q=>({...q}));
+  if(!old.rooms) old.rooms=[{id:'r1',name:'Classroom 1'},{id:'r2',name:'Classroom 2'},{id:'r3',name:'Computer Lab'},{id:'r4',name:'Library'},{id:'r5',name:'Playground'}];
+  if(old.teachers) old.teachers=migrateTeachers(old.teachers, old.qualMaster);
+  if(old.teachers) old.teachers=old.teachers.map(t=>({teacherType:'regular',availFrom:'',availTo:'',...t}));
+  if(!old.proxyAssignments) old.proxyAssignments={};
+  if(!old.lectureLimits) old.lectureLimits=LECTURE_LIMITS;
+  // Migrate subjects: add subGroup and standards if missing
+  if(old.subjects) old.subjects=old.subjects.map(s=>{
+    if(s.subGroup) return s;
+    const def=ICSE_SUBJECTS.find(d=>d.id===s.id||d.code===s.code);
+    return {...s, subGroup:def?def.subGroup:'regular', standards:def?def.standards:[]};
+  });
+  return old;
+}
+
+async function loadData(){
+  if(window.__TWS_EMBEDDED_DATA){try{const e=JSON.parse(JSON.stringify(window.__TWS_EMBEDDED_DATA));const m=migrateData(e);await store.set(STORAGE_KEY,JSON.stringify(m));return m;}catch(e){}}
+  try{const r=await store.get(STORAGE_KEY);if(r&&r.value)return JSON.parse(r.value);}catch(e){}
+  for(const k of['tws_timetable_v7','tws_timetable_v6','tws_timetable_v5','tws_timetable_v4','tws_timetable_v3','tws_timetable_v2','tws_timetable_v1']){
+    try{const r=await store.get(k);if(r&&r.value){const o=migrateData(JSON.parse(r.value));await store.set(STORAGE_KEY,JSON.stringify(o));return o;}}catch(e){}
+  }
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+async function saveData(d){try{await store.set(STORAGE_KEY,JSON.stringify(d))}catch(e){}}
+
+// ====== Save/Export/Import ======
+function exportJSON(data){const n=prompt('Save data as:','TWS_Timetable_Data_'+new Date().toISOString().slice(0,10));if(!n)return;const b=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=n.endsWith('.json')?n:n+'.json';a.click();URL.revokeObjectURL(u);}
+function saveAsHTMLFile(data){const n=prompt('Save timetable file as:','TWS_Timetable_Studio_'+new Date().toISOString().slice(0,10));if(!n)return;const h=document.documentElement.outerHTML.replace(/<script id="tws-embedded-data">[\s\S]*?<\/script>\s*/g,'');const ds='<script id="tws-embedded-data">window.__TWS_EMBEDDED_DATA='+JSON.stringify(data)+';<\/script>';const f=h.replace('</body>',ds+'\n</body>');const b=new Blob(['<!DOCTYPE html>\n<html>'+f.replace(/^<html[^>]*>/,'')],{type:'text/html'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download=(n.endsWith('.html')?n:n+'.html');a.click();URL.revokeObjectURL(u);}
+function importJSON(cb){const i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{try{const d=migrateData(JSON.parse(ev.target.result));if(d.school&&d.classes&&d.teachers)cb(d);else alert('Invalid file.');}catch(e){alert('Parse error.');}};r.readAsText(f);};i.click();}
+
+// ====== Section Export (Print / PDF / Excel / Word) ======
+function buildExportHTML(title, headers, rows, subtitle){
+  const date = new Date().toLocaleDateString('en-IN');
+  let h = '<html><head><meta charset="utf-8"><title>'+title+'</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#1a1f1c}h1{font-size:20px;margin:0 0 4px}h2{font-size:13px;color:#666;font-weight:400;margin:0 0 16px}table{width:100%;border-collapse:collapse;margin-top:8px}th{background:#f0f0f0;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;border:1px solid #ccc}td{padding:8px 10px;border:1px solid #ddd;font-size:13px;vertical-align:top}.footer{margin-top:20px;font-size:10px;color:#999;text-align:center}</style></head><body>';
+  h += '<h1>The World School, ICSE – '+title+'</h1><h2>'+(subtitle||'')+' | Generated: '+date+'</h2>';
+  h += '<table><thead><tr>'+headers.map(c=>'<th>'+c+'</th>').join('')+'</tr></thead><tbody>';
+  rows.forEach(r=>{h+='<tr>'+r.map(c=>'<td>'+(c!=null?c:'')+'</td>').join('')+'</tr>';});
+  h += '</tbody></table><div class="footer">The World School, ICSE – Bhusawal | Kolte Foundation Educational Institution</div></body></html>';
+  return h;
+}
+
+function downloadBlob(blob, filename){
+  const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=filename;a.click();URL.revokeObjectURL(u);
+}
+
+function doExport(format, title, headers, rows, subtitle){
+  const fn = prompt('File name:', title.replace(/\s+/g,'_')+'_'+new Date().toISOString().slice(0,10));
+  if(!fn) return;
+  const html = buildExportHTML(title, headers, rows, subtitle);
+
+  if(format==='print'||format==='pdf'){
+    const w=window.open('','_blank');w.document.write(html);w.document.close();
+    setTimeout(()=>w.print(),400);
+    return;
+  }
+  if(format==='excel'){
+    // Excel XML (SpreadsheetML) – opens natively in Excel/Sheets
+    let xml='<?xml version="1.0"?><?mso-application progid="Excel.Sheet"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="'+title+'"><Table>';
+    xml+='<Row>'+headers.map(c=>'<Cell><Data ss:Type="String">'+c+'</Data></Cell>').join('')+'</Row>';
+    rows.forEach(r=>{xml+='<Row>'+r.map(c=>'<Cell><Data ss:Type="String">'+(c!=null?String(c).replace(/&/g,'&amp;').replace(/</g,'&lt;'):'')+'</Data></Cell>').join('')+'</Row>';});
+    xml+='</Table></Worksheet></Workbook>';
+    downloadBlob(new Blob([xml],{type:'application/vnd.ms-excel'}), fn.endsWith('.xls')?fn:fn+'.xls');
+    return;
+  }
+  if(format==='word'){
+    const docHtml='<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body>'+html.match(/<body>([\s\S]*)<\/body>/)[1]+'</body></html>';
+    downloadBlob(new Blob([docHtml],{type:'application/msword'}), fn.endsWith('.doc')?fn:fn+'.doc');
+    return;
+  }
+}
+
+function ExportBar({title, headers, rows, subtitle}){
+  return(
+    <div className="no-print" style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+      <button className="btn btn-ghost btn-sm" onClick={()=>doExport('print',title,headers,rows,subtitle)}>Print / PDF</button>
+      <button className="btn btn-ghost btn-sm" onClick={()=>doExport('excel',title,headers,rows,subtitle)}>Export Excel</button>
+      <button className="btn btn-ghost btn-sm" onClick={()=>doExport('word',title,headers,rows,subtitle)}>Export Word</button>
+    </div>
+  );
+}
+
+// ====== Helpers ======
+const allocKey=(c,s)=>`${c}|${s}`;
+function isNonTeaching(p){return p.isBreak||p.isAssembly||p.isOrientation}
+function getTeachingCount(p){return p.filter(x=>!isNonTeaching(x)).length}
+function getPeriodsForClass(school,cls){
+  if(cls&&cls.group==='preprimary') return school.preprimaryPeriods||school.primaryPeriods;
+  if(cls&&cls.group==='upper') return school.upperPeriods||school.primaryPeriods;
+  return school.primaryPeriods;
+}
+function timeOverlaps(s1,e1,s2,e2){return s1<e2&&e1>s2}
+
+function findConflicts(tt,classes,school){
+  const conflicts={};const teacherMap={};const roomMap={};
+  classes.forEach(cls=>{const days=tt[cls.id]||{};const pList=getPeriodsForClass(school,cls);
+    Object.keys(days).forEach(d=>{Object.keys(days[d]||{}).forEach(pi=>{const c=days[d][pi];if(!c)return;const p=pList[Number(pi)];if(!p||isNonTeaching(p))return;
+      // Teacher conflict check
+      if(c.teacherId){const k=`${d}|${p.start}|${p.end}|T|${c.teacherId}`;if(!teacherMap[k])teacherMap[k]=[];teacherMap[k].push(`${cls.id}|${d}|${pi}`);}
+      // Room conflict check
+      if(c.roomId){const rk=`${d}|${p.start}|${p.end}|R|${c.roomId}`;if(!roomMap[rk])roomMap[rk]=[];roomMap[rk].push(`${cls.id}|${d}|${pi}`);}
+    });});});
+  Object.values(teacherMap).forEach(arr=>{if(arr.length>1)arr.forEach(k=>{conflicts[k]='teacher';});});
+  Object.values(roomMap).forEach(arr=>{if(arr.length>1)arr.forEach(k=>{conflicts[k]=conflicts[k]?'both':'room';});});
+  return conflicts;
+}
+
+function teacherLoad(teacher,tt,classes,school){
+  let total=0;const bySubject={},byClass={},byDay={};
+  school.days.forEach((_,i)=>{byDay[i]=0;});
+  classes.forEach(cls=>{const tbl=tt[cls.id]||{};const pList=getPeriodsForClass(school,cls);
+    Object.keys(tbl).forEach(d=>{Object.keys(tbl[d]||{}).forEach(pi=>{const c=tbl[d][pi];
+      if(c&&c.teacherId===teacher.id){const p=pList[Number(pi)];if(p&&!isNonTeaching(p)){total++;bySubject[c.subjectId]=(bySubject[c.subjectId]||0)+1;byClass[cls.id]=(byClass[cls.id]||0)+1;byDay[d]=(byDay[d]||0)+1;}}});});});
+  return{total,bySubject,byClass,byDay};
+}
+
+function getTeacherScheduleForDay(teacherId,dayIdx,tt,classes,school){
+  const sched=[];
+  classes.forEach(cls=>{const pList=getPeriodsForClass(school,cls);const dayTT=(tt[cls.id]||{})[dayIdx]||{};
+    Object.entries(dayTT).forEach(([pi,cell])=>{if(cell&&cell.teacherId===teacherId){const p=pList[Number(pi)];if(p&&!isNonTeaching(p))sched.push({periodIdx:Number(pi),name:p.name,start:p.start,end:p.end,classId:cls.id,className:cls.name,subjectId:cell.subjectId,group:cls.group});}});});
+  return sched.sort((a,b)=>a.start.localeCompare(b.start));
+}
+
+function findFreeTeachers(dayIdx,start,end,tt,classes,school,teachers,excludeIds){
+  const busy=new Set(excludeIds||[]);
+  classes.forEach(cls=>{const pList=getPeriodsForClass(school,cls);const dayTT=(tt[cls.id]||{})[dayIdx]||{};
+    Object.entries(dayTT).forEach(([pi,cell])=>{if(!cell||!cell.teacherId)return;const p=pList[Number(pi)];if(!p||isNonTeaching(p))return;
+      if(timeOverlaps(p.start,p.end,start,end))busy.add(cell.teacherId);});});
+  return teachers.filter(t=>!busy.has(t.id));
+}
+
+// ====== Searchable Select ======
+function SearchSelect({value,options,onChange,placeholder,style:wrapStyle}){
+  const[open,setOpen]=useState(false);const[search,setSearch]=useState('');const ref=useRef(null);
+  const filtered=options.filter(o=>o.label.toLowerCase().includes(search.toLowerCase()));
+  const selected=options.find(o=>o.value===value);
+  useEffect(()=>{if(!open)return;const h=e=>{if(ref.current&&!ref.current.contains(e.target))setOpen(false);};document.addEventListener('mousedown',h);return()=>document.removeEventListener('mousedown',h);},[open]);
+  return(
+    <div className="ss-wrap" ref={ref} style={wrapStyle}>
+      <button type="button" className="ss-trigger" onClick={()=>{setOpen(!open);setSearch('');}}>
+        <span style={{color:selected?'var(--ink)':'var(--ink-muted)'}}>{selected?selected.label:(placeholder||'Select...')}</span>
+        <span className="ss-arrow">{open?'▲':'▼'}</span>
+      </button>
+      {open&&(<div className="ss-drop">
+        <input className="ss-search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Type to search..." autoFocus/>
+        <div className="ss-list">{filtered.length===0?<div className="ss-opt" style={{color:'var(--ink-muted)',fontStyle:'italic'}}>No match</div>:
+          filtered.map(o=>(<div key={o.value} className={`ss-opt ${o.value===value?'selected':''}`} onClick={()=>{onChange(o.value);setOpen(false);setSearch('');}}>{o.label}</div>))
+        }</div>
+      </div>)}
+    </div>
+  );
+}
+
+// ====== App ======
+function App(){
+  const[data,setData]=useState(null);const[tab,setTab]=useState('dashboard');const[loading,setLoading]=useState(true);
+  useEffect(()=>{loadData().then(d=>{setData(d);setLoading(false);});},[]);
+  useEffect(()=>{if(data&&!loading)saveData(data);},[data,loading]);
+  if(loading||!data)return<div style={{padding:40,color:'#8a8f88'}}>Loading…</div>;
+  const update=patch=>setData(d=>({...d,...patch}));
+  const tabs=[{id:'dashboard',num:'01',name:'Overview'},{id:'school',num:'02',name:'Day Structure'},{id:'classes',num:'03',name:'Classes'},{id:'qualmaster',num:'04',name:'Qual. Master'},{id:'teachers',num:'05',name:'Faculty'},{id:'subjects',num:'06',name:'Subjects'},{id:'allocate',num:'07',name:'Allocations'},{id:'timetable',num:'08',name:'Timetable'},{id:'load',num:'09',name:'Teacher Load'},{id:'proxy',num:'10',name:'Proxy Mgmt'}];
+  return(
+    <div className="app">
+      <aside className="sidebar">
+        <div className="brand"><div className="mark">The World School · ICSE</div><div className="name serif">Timetable <em>Studio</em></div></div>
+        <nav className="nav">{tabs.map(t=>(<button key={t.id} className={`nav-item ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)}><span className="num">{t.num}</span><span>{t.name}</span></button>))}</nav>
+        <div className="footer-note" style={{padding:'12px 14px'}}>
+          <button className="btn btn-primary btn-sm" style={{width:'100%',marginBottom:6,justifyContent:'center'}} onClick={()=>saveAsHTMLFile(data)}>Save as File</button>
+          <div style={{display:'flex',gap:6}}>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={()=>exportJSON(data)}>Export JSON</button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={()=>importJSON(d=>{setData(d);saveData(d);})}>Import JSON</button>
+          </div>
+        </div>
+      </aside>
+      <main className="main">
+        {tab==='dashboard'&&<Dashboard data={data} setTab={setTab}/>}
+        {tab==='school'&&<SchoolSetup data={data} update={update}/>}
+        {tab==='classes'&&<ClassesPage data={data} update={update}/>}
+        {tab==='qualmaster'&&<QualMasterPage data={data} update={update}/>}
+        {tab==='teachers'&&<TeachersPage data={data} update={update}/>}
+        {tab==='subjects'&&<SubjectsPage data={data} update={update}/>}
+        {tab==='allocate'&&<AllocatePage data={data} update={update}/>}
+        {tab==='timetable'&&<TimetablePage data={data} update={update}/>}
+        {tab==='load'&&<LoadPage data={data}/>}
+        {tab==='proxy'&&<ProxyPage data={data} update={update}/>}
+      </main>
+    </div>
+  );
+}
+
+// ===== Dashboard =====
+function Dashboard({data,setTab}){
+  const preP=getTeachingCount(data.school.preprimaryPeriods||[])*data.school.days.length;
+  const pri=getTeachingCount(data.school.primaryPeriods)*data.school.days.length;
+  const up=getTeachingCount(data.school.upperPeriods||data.school.primaryPeriods)*data.school.days.length;
+  let filled=0,total=0;
+  data.classes.forEach(c=>{total+=(c.group==='preprimary'?preP:c.group==='upper'?up:pri);const tt=data.timetable[c.id]||{};Object.values(tt).forEach(d=>Object.values(d||{}).forEach(p=>{if(p&&p.subjectId)filled++;}));});
+  const pct=total?Math.round(filled/total*100):0;
+  const conflicts=findConflicts(data.timetable,data.classes,data.school);const cc=Object.keys(conflicts).length;
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif">A calmer way to plan the <em>week</em>.</h1><div className="sub">Timetable builder with dual Primary/Upper grids, teacher load analysis, and proxy management.</div></div></div>
+    <div className="grid-4" style={{marginBottom:24}}>
+      <div className="stat"><div className="label">Classes</div><div className="val">{data.classes.length}</div><div className="delta">{data.classes.filter(c=>c.group==='preprimary').length} pre + {data.classes.filter(c=>c.group==='primary').length} pri + {data.classes.filter(c=>c.group==='upper').length} upper</div></div>
+      <div className="stat"><div className="label">Faculty</div><div className="val">{data.teachers.length}</div><div className="delta">{data.teachers.filter(t=>t.status==='OLD').length} old + {data.teachers.filter(t=>t.status==='NEW').length} new</div></div>
+      <div className="stat"><div className="label">Filled</div><div className="val">{pct}<span style={{fontSize:18}}>%</span></div><div className="delta">{filled} of {total} slots</div></div>
+      <div className="stat"><div className="label">Conflicts</div><div className="val" style={{color:cc?'var(--danger)':'var(--accent)'}}>{cc}</div><div className="delta">{cc?'need resolution':'all clear'}</div></div>
+    </div>
+    <div className="card"><div className="card-title">Quick Nav</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+        {[{t:'school',l:'Day Structure',d:'Sessions & period grids'},{t:'teachers',l:'Faculty',d:'Profiles, qualifications, photos'},{t:'timetable',l:'Timetable',d:'Build the master grid'},
+          {t:'allocate',l:'Allocations',d:'Teacher × Subject matrix'},{t:'load',l:'Teacher Load',d:'Workload analysis'},{t:'proxy',l:'Proxy Mgmt',d:'Substitute teacher scheduling'}
+        ].map(s=>(<button key={s.t} onClick={()=>setTab(s.t)} style={{textAlign:'left',padding:'14px 16px',border:'1px solid var(--line)',borderRadius:8,background:'var(--bg)',cursor:'pointer'}}><div style={{fontWeight:600,fontSize:13,marginBottom:2}}>{s.l}</div><div style={{fontSize:11.5,color:'var(--ink-soft)'}}>{s.d}</div></button>))}
+      </div>
+    </div>
+  </div>);
+}
+
+// ===== SchoolSetup =====
+function SchoolSetup({data,update}){
+  const[session,setSession]=useState(data.school.activeSession||'normal');const[group,setGroup]=useState('primary');
+  const getPeriods=g=>{if(g==='preprimary')return data.school.preprimaryPeriods||[];if(g==='upper')return data.school.upperPeriods||data.school.primaryPeriods;return data.school.primaryPeriods;};
+  const getStart=g=>{if(g==='preprimary')return data.school.preprimaryStart||'08:30';if(g==='upper')return data.school.upperStart||'08:15';return data.school.primaryStart||'08:00';};
+  const[edited,setEdited]=useState(getPeriods(group).map(p=>({...p})));
+  const[startTime,setStartTime]=useState(getStart(group));
+  const[days,setDays]=useState(data.school.days);
+  useEffect(()=>{setEdited(getPeriods(group).map(x=>({...x})));setStartTime(getStart(group));},[group,data.school.primaryPeriods,data.school.upperPeriods,data.school.preprimaryPeriods]);
+  const recalcTimes=()=>{setEdited(calcTimes(startTime,edited));};
+  useEffect(()=>{setEdited(prev=>calcTimes(startTime,prev));},[startTime]);
+  const loadSession=k=>{setSession(k);const pr=SESSION_PRESETS[k];update({school:{...data.school,activeSession:k,preprimaryPeriods:buildSessionPeriods(pr.preprimary),primaryPeriods:buildSessionPeriods(pr.primary),upperPeriods:buildSessionPeriods(pr.upper),preprimaryStart:pr.preprimary.startTime,primaryStart:pr.primary.startTime,upperStart:pr.upper.startTime}});};
+  const save=()=>{const recalced=calcTimes(startTime,edited);const startKey=group==='preprimary'?'preprimaryStart':group==='upper'?'upperStart':'primaryStart';const periodKey=group==='preprimary'?'preprimaryPeriods':group==='upper'?'upperPeriods':'primaryPeriods';update({school:{...data.school,[periodKey]:recalced,[startKey]:startTime,days,activeSession:session}});};
+  const updP=(i,k,v)=>setEdited(p=>{const n=[...p];n[i]={...n[i],[k]:v};if(k==='duration')return calcTimes(startTime,n);return n;});
+  const addP=()=>setEdited(p=>calcTimes(startTime,[...p,{name:'New',duration:35}]));
+  const remP=i=>setEdited(p=>calcTimes(startTime,p.filter((_,idx)=>idx!==i)));
+  const cycleType=i=>setEdited(p=>{const n=[...p];const c=n[i];if(!c.isBreak&&!c.isAssembly&&!c.isOrientation)n[i]={...c,isBreak:true,isAssembly:false,isOrientation:false};else if(c.isBreak)n[i]={...c,isBreak:false,isAssembly:true,isOrientation:false};else if(c.isAssembly)n[i]={...c,isBreak:false,isAssembly:false,isOrientation:true};else n[i]={...c,isBreak:false,isAssembly:false,isOrientation:false};return n;});
+  const tLabel=p=>p.isBreak?'Recess':p.isAssembly?'Assembly':p.isOrientation?'Orientation':'Teaching';
+  const tStyle=p=>p.isBreak?{background:'var(--danger-soft)',color:'var(--danger)'}:p.isAssembly?{background:'rgba(13,79,60,0.1)',color:'var(--accent)'}:p.isOrientation?{background:'rgba(184,101,31,0.1)',color:'var(--warm)'}:{};
+  const totalTeaching=edited.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
+  const totalDay=edited.reduce((s,p)=>s+(p.duration||0),0);
+  const groupLabel=group==='preprimary'?'Pre-Primary':group==='upper'?'Upper':'Primary';
+  const dsExpH=['#','Label','Duration','Start','End','Type'];
+  const dsExpR=edited.map((p,i)=>[String(i+1).padStart(2,'0'),p.name,(p.duration||0)+' min',p.start||'',p.end||'',tLabel(p)]);
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif">Day <em>Structure</em></h1><div className="sub">Set start time + duration per period. Times auto-calculate. Pre-Primary, Primary, and Upper grids are independent.</div></div><div className="actions">
+      <ExportBar title={'Day Structure – '+groupLabel} headers={dsExpH} rows={dsExpR} subtitle={SESSION_PRESETS[session].label+' Session'}/>
+      <button className="btn btn-primary" onClick={save}>Save Changes</button></div></div>
+    <div className="card"><div className="card-title">Session Presets</div><div className="grid-3">{Object.entries(SESSION_PRESETS).map(([k,pr])=>(<button key={k} onClick={()=>loadSession(k)} style={{textAlign:'left',padding:'16px 18px',border:session===k?'2px solid var(--accent)':'1px solid var(--line)',borderRadius:8,background:session===k?'var(--accent)':'var(--paper)',color:session===k?'var(--paper)':'var(--ink)',cursor:'pointer'}}><div style={{fontWeight:600,fontSize:14}}>{pr.label}</div><div style={{fontSize:12,opacity:.7}}>{pr.months}</div></button>))}</div></div>
+    <div className="card"><div className="card-title">Working Days</div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}>{['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d=>(<button key={d} onClick={()=>setDays(ds=>ds.includes(d)?ds.filter(x=>x!==d):[...ds,d])} className={days.includes(d)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{d}</button>))}</div></div>
+    <div className="card">
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+        <div style={{display:'flex',alignItems:'center',gap:16}}><div className="card-title" style={{margin:0}}>Period Grid</div>
+          <div className="tab-bar">
+            <button className={`tab-btn ${group==='preprimary'?'active':''}`} onClick={()=>setGroup('preprimary')}>Pre-Primary</button>
+            <button className={`tab-btn ${group==='primary'?'active':''}`} onClick={()=>setGroup('primary')}>Primary (1–4)</button>
+            <button className={`tab-btn ${group==='upper'?'active':''}`} onClick={()=>setGroup('upper')}>Upper (5–10)</button>
+          </div>
+        </div><button className="btn btn-ghost btn-sm" onClick={addP}>+ Add</button></div>
+      <div style={{display:'flex',gap:16,alignItems:'center',marginBottom:12,flexWrap:'wrap'}}>
+        <div style={{display:'flex',alignItems:'center',gap:8}}><label style={{fontSize:12,fontWeight:500,color:'var(--ink-soft)'}}>Start Time:</label><input type="time" value={startTime} onChange={e=>setStartTime(e.target.value)} style={{padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontWeight:600}}/></div>
+        <span style={{fontSize:12,color:'var(--ink-muted)'}}>{getTeachingCount(edited)} teaching periods | Teaching: {totalTeaching} min | Total day: {totalDay} min ({Math.floor(totalDay/60)}h {totalDay%60}m)</span>
+      </div>
+      <table><thead><tr><th>#</th><th>Label</th><th>Duration</th><th>Start</th><th>End</th><th>Type</th><th></th></tr></thead><tbody>
+        {edited.map((p,i)=>(<tr key={i}><td className="mono" style={{color:'var(--ink-muted)'}}>{String(i+1).padStart(2,'0')}</td><td><input value={p.name} onChange={e=>updP(i,'name',e.target.value)} style={{width:140,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5}}/></td><td><input type="number" value={p.duration||30} onChange={e=>updP(i,'duration',Number(e.target.value)||1)} style={{width:70,padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,textAlign:'center'}} min={1}/></td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.start||''}</td><td className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{p.end||''}</td><td><button className="btn btn-ghost btn-sm" style={tStyle(p)} onClick={()=>cycleType(i)}>{tLabel(p)}</button></td><td style={{textAlign:'right'}}><button className="btn btn-icon btn-danger" onClick={()=>remP(i)}>x</button></td></tr>))}
+      </tbody></table>
+    </div>
+  </div>);
+}
+
+// ===== Classes =====
+function ClassesPage({data,update}){
+  const[name,setName]=useState('');const[strength,setStrength]=useState('');const[teacher,setTeacher]=useState('');const[grp,setGrp]=useState('primary');
+  const[editId,setEditId]=useState(null);const[draft,setDraft]=useState(null);
+  const add=()=>{if(!name.trim())return;const grade=grp==='preprimary'?0:parseInt(name)||0;update({classes:[...data.classes,{id:uid(),name:name.trim(),group:grp,strength:Number(strength)||0,classTeacherId:teacher||null,grade}]});setName('');setStrength('');setTeacher('');};
+  const startEdit=c=>{setEditId(c.id);setDraft({...c});};
+  const cancelEdit=()=>{setEditId(null);setDraft(null);};
+  const saveEdit=()=>{if(!draft)return;update({classes:data.classes.map(c=>c.id===draft.id?draft:c)});setEditId(null);setDraft(null);};
+  const deleteClass=id=>{if(!confirm('Delete this class and its timetable?'))return;setEditId(null);setDraft(null);update({classes:data.classes.filter(c=>c.id!==id),timetable:Object.fromEntries(Object.entries(data.timetable).filter(([k])=>k!==id))});};
+  const tOpts=data.teachers.map(t=>({value:t.id,label:t.code+' – '+t.name}));
+  const iStyle={padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontSize:12.5};
+  const expH=['Section','Group','Strength','Class Teacher'];
+  const expR=data.classes.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);return[c.name,c.group==='primary'?'Primary':'Upper',c.strength||'',ct?ct.name:''];});
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif"><em>Classes</em> & Sections</h1><div className="sub">Click any row to edit name, strength, group, or class teacher.</div></div>
+      <ExportBar title="Classes & Sections" headers={expH} rows={expR}/>
+    </div>
+    <div className="card"><div className="card-title">Add a Class</div><div className="row">
+      <div className="field"><label>Section</label><input placeholder="e.g. 5C" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()}/></div>
+      <div className="field"><label>Group</label><select value={grp} onChange={e=>setGrp(e.target.value)}><option value="preprimary">Pre-Primary</option><option value="primary">Primary</option><option value="upper">Upper</option></select></div>
+      <div className="field"><label>Strength</label><input type="number" placeholder="35" value={strength} onChange={e=>setStrength(e.target.value)}/></div>
+      <div className="field"><label>Class Teacher</label><SearchSelect value={teacher} options={[{value:'',label:'-- None --'},...tOpts]} onChange={setTeacher}/></div>
+      <button className="btn btn-primary" onClick={add}>Add</button>
+    </div></div>
+    <div className="card" style={{padding:0,overflow:'hidden'}}>{data.classes.length===0?<div className="empty-state"><h3 className="serif">No classes</h3></div>:
+      <table><thead><tr><th>Section</th><th>Group</th><th>Strength</th><th>Class Teacher</th><th></th></tr></thead><tbody>
+        {data.classes.map(c=>{const ct=data.teachers.find(t=>t.id===c.classTeacherId);return(
+          <React.Fragment key={c.id}>
+          <tr style={{cursor:'pointer'}} onClick={()=>editId===c.id?null:startEdit(c)}>
+            <td style={{fontWeight:600}}>{c.name}</td>
+            <td><span className={`badge ${c.group==='preprimary'?'':c.group==='primary'?'badge-ok':'badge-warn'}`}>{c.group==='preprimary'?'PRE':c.group==='primary'?'PRI':'UPR'}</span></td>
+            <td>{c.strength||'--'}</td>
+            <td>{ct?ct.name:<span style={{color:'var(--ink-muted)'}}>--</span>}</td>
+            <td style={{textAlign:'right'}} onClick={e=>e.stopPropagation()}><button className="btn btn-icon btn-danger" onClick={()=>deleteClass(c.id)}>x</button></td>
+          </tr>
+          {editId===c.id&&draft&&(
+            <tr><td colSpan={5} style={{background:'var(--bg)',padding:'16px 18px',borderLeft:'3px solid var(--accent)'}} onClick={e=>e.stopPropagation()}>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 120px 100px 1fr',gap:12,alignItems:'end',marginBottom:12}}>
+                <div className="field" style={{margin:0}}><label>Section Name</label><input value={draft.name} onChange={e=>setDraft(d=>({...d,name:e.target.value}))} style={iStyle}/></div>
+                <div className="field" style={{margin:0}}><label>Group</label><select value={draft.group} onChange={e=>setDraft(d=>({...d,group:e.target.value}))} style={iStyle}><option value="preprimary">Pre-Primary</option><option value="primary">Primary</option><option value="upper">Upper</option></select></div>
+                <div className="field" style={{margin:0}}><label>Strength</label><input type="number" value={draft.strength||''} onChange={e=>setDraft(d=>({...d,strength:Number(e.target.value)||0}))} style={iStyle}/></div>
+                <div className="field" style={{margin:0}}><label>Class Teacher</label><SearchSelect value={draft.classTeacherId||''} options={[{value:'',label:'-- None --'},...tOpts]} onChange={v=>setDraft(d=>({...d,classTeacherId:v||null}))}/></div>
+              </div>
+              <div style={{display:'flex',gap:8,justifyContent:'flex-end',borderTop:'1px solid var(--line)',paddingTop:12}}>
+                <button className="btn btn-danger" onClick={()=>deleteClass(draft.id)}>Delete</button>
+                <button className="btn btn-ghost" onClick={cancelEdit}>Cancel</button>
+                <button className="btn btn-success" onClick={saveEdit}>Save</button>
+              </div>
+            </td></tr>
+          )}
+          </React.Fragment>
+        );})}
+      </tbody></table>}
+    </div>
+  </div>);
+}
+
+// ===== Qualification Master =====
+function QualMasterPage({data,update}){
+  const[name,setName]=useState('');const[cat,setCat]=useState('degree');const[subjMap,setSubjMap]=useState([]);
+  const[editId,setEditId]=useState(null);
+  const qm=data.qualMaster||[];
+  const addQual=()=>{if(!name.trim())return;update({qualMaster:[...qm,{id:uid(),name:name.trim(),cat,subjectMap:[...subjMap]}]});setName('');setCat('degree');setSubjMap([]);};
+  const removeQual=id=>{setEditId(null);update({qualMaster:qm.filter(q=>q.id!==id)});};
+  const updQual=(qId,patch)=>update({qualMaster:qm.map(q=>q.id===qId?{...q,...patch}:q)});
+  const toggleSubjMap=(qId,sId)=>{const q=qm.find(x=>x.id===qId);if(!q)return;const sm=q.subjectMap||[];updQual(qId,{subjectMap:sm.includes(sId)?sm.filter(x=>x!==sId):[...sm,sId]});};
+  const toggleNewSubj=sId=>setSubjMap(s=>s.includes(sId)?s.filter(x=>x!==sId):[...s,sId]);
+  const iStyle={padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontSize:12.5};
+  const degrees=qm.filter(q=>q.cat==='degree');const professional=qm.filter(q=>q.cat==='professional');const other=qm.filter(q=>q.cat!=='degree'&&q.cat!=='professional');
+  const expH=['Name','Category','Subject Mapping'];
+  const expR=qm.map(q=>[q.name,q.cat,(q.subjectMap||[]).map(sId=>{const s=data.subjects.find(x=>x.id===sId);return s?s.code:'';}).join(', ')]);
+
+  const renderGroup=(label,items)=>(
+    <div style={{marginBottom:16}}>
+      <div style={{fontSize:12,fontWeight:600,color:'var(--ink-soft)',marginBottom:8,textTransform:'uppercase',letterSpacing:'.08em'}}>{label} ({items.length})</div>
+      {items.map(q=>(
+        <React.Fragment key={q.id}>
+        <div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 0',borderBottom:'1px solid var(--line-soft)',cursor:'pointer'}} onClick={()=>setEditId(editId===q.id?null:q.id)}>
+          <span style={{fontWeight:600,flex:'1 1 200px'}}>{q.name}</span>
+          <div style={{display:'flex',gap:3,flexWrap:'wrap',flex:'2 1 300px'}}>{(q.subjectMap||[]).map(sId=>{const s=data.subjects.find(x=>x.id===sId);return s?<span key={sId} className="chip"><span className="chip-color" style={{background:s.color}}></span>{s.code}</span>:null;})}{!(q.subjectMap||[]).length&&<span style={{color:'var(--ink-muted)',fontSize:11,fontStyle:'italic'}}>no mapping</span>}</div>
+          <button className="btn btn-icon btn-danger" onClick={e=>{e.stopPropagation();removeQual(q.id);}}>x</button>
+        </div>
+        {editId===q.id&&(
+          <div style={{background:'var(--bg)',padding:'12px 16px',marginBottom:8,borderLeft:'3px solid var(--accent)',borderRadius:'0 6px 6px 0'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 120px',gap:10,marginBottom:10}}>
+              <div className="field" style={{margin:0}}><label>Name</label><input value={q.name} onChange={e=>updQual(q.id,{name:e.target.value})} style={iStyle}/></div>
+              <div className="field" style={{margin:0}}><label>Category</label><select value={q.cat} onChange={e=>updQual(q.id,{cat:e.target.value})} style={iStyle}><option value="degree">Degree</option><option value="professional">Professional</option><option value="other">Other</option></select></div>
+            </div>
+            <div><label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Subject Mapping (auto-assigned when selected in Faculty)</label>
+              <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{data.subjects.map(s=>(<button key={s.id} onClick={()=>toggleSubjMap(q.id,s.id)} className={(q.subjectMap||[]).includes(s.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'} style={(q.subjectMap||[]).includes(s.id)?{background:s.color,borderColor:s.color}:{fontSize:11.5}}>{s.code}</button>))}</div>
+            </div>
+          </div>
+        )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif">Qualification <em>Master</em></h1><div className="sub">Manage all degree and professional qualifications. Subject mappings here auto-assign when a qualification is selected in Faculty.</div></div>
+      <ExportBar title="Qualification Master" headers={expH} rows={expR}/>
+    </div>
+    <div className="card"><div className="card-title">Add Qualification</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 120px auto',gap:12,alignItems:'end',marginBottom:12}}>
+        <div className="field" style={{margin:0}}><label>Qualification Name</label><input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. M.A.(History)" onKeyDown={e=>e.key==='Enter'&&addQual()} style={iStyle}/></div>
+        <div className="field" style={{margin:0}}><label>Category</label><select value={cat} onChange={e=>setCat(e.target.value)} style={iStyle}><option value="degree">Degree</option><option value="professional">Professional</option><option value="other">Other</option></select></div>
+        <button className="btn btn-primary" onClick={addQual}>Add</button>
+      </div>
+      <div className="field" style={{margin:0}}><label>Subject Mapping for new entry</label>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{data.subjects.map(s=>(<button key={s.id} onClick={()=>toggleNewSubj(s.id)} className={subjMap.includes(s.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'} style={subjMap.includes(s.id)?{background:s.color,borderColor:s.color}:{fontSize:11.5}}>{s.code}</button>))}</div>
+      </div>
+    </div>
+    <div className="card">
+      {renderGroup('Degree Qualifications',degrees)}
+      {renderGroup('Professional Courses',professional)}
+      {other.length>0&&renderGroup('Other',other)}
+    </div>
+  </div>);
+}
+
+// ===== Teachers =====
+function TeachersPage({data,update}){
+  const[editId,setEditId]=useState(null);const[draft,setDraft]=useState(null);const[addName,setAddName]=useState('');const[addCode,setAddCode]=useState('');
+  const startEdit=(t)=>{setEditId(t.id);setDraft({...t,subjects:[...(t.subjects||[])]});};
+  const cancelEdit=()=>{setEditId(null);setDraft(null);};
+  const saveEdit=()=>{if(!draft)return;update({teachers:data.teachers.map(t=>t.id===draft.id?draft:t)});setEditId(null);setDraft(null);};
+  const deleteTeacher=id=>{if(!confirm('Delete this teacher?'))return;setEditId(null);setDraft(null);update({teachers:data.teachers.filter(t=>t.id!==id)});};
+  const updDraft=(k,v)=>setDraft(d=>({...d,[k]:v}));
+  const toggleDraftSubj=sId=>setDraft(d=>{const s=d.subjects||[];return{...d,subjects:s.includes(sId)?s.filter(x=>x!==sId):[...s,sId]};});
+  const handlePhoto=()=>{const inp=document.createElement('input');inp.type='file';inp.accept='image/*';inp.onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{const img=new Image();img.onload=()=>{const c=document.createElement('canvas');c.width=80;c.height=80;const ctx=c.getContext('2d');const s=Math.min(img.width,img.height);const sx=(img.width-s)/2;const sy=(img.height-s)/2;ctx.drawImage(img,sx,sy,s,s,0,0,80,80);updDraft('photo',c.toDataURL('image/jpeg',0.7));};img.src=ev.target.result;};r.readAsDataURL(f);};inp.click();};
+  const qm=data.qualMaster||[];
+  const autoSubjects=(qualIds)=>{if(!draft)return;let mapped=[];(qualIds||[]).forEach(qId=>{const q=qm.find(x=>x.id===qId);if(q&&q.subjectMap)mapped=[...mapped,...q.subjectMap];});if(mapped.length){const merged=[...new Set([...(draft.subjects||[]),...mapped])];setDraft(d=>({...d,subjects:merged}));}};
+  const toggleDraftQual=qId=>setDraft(d=>{const arr=d.qualifications||[];const nArr=arr.includes(qId)?arr.filter(x=>x!==qId):[...arr,qId];autoSubjects(nArr);return{...d,qualifications:nArr};});
+  const getQualNames=(t)=>(t.qualifications||[]).map(qId=>{const q=qm.find(x=>x.id===qId);return q?q.name:''}).filter(Boolean).join(', ');
+  const quickAdd=()=>{if(!addName.trim())return;update({teachers:[...data.teachers,{...mkTeacher(uid(),addName.trim(),addCode.trim()||addName.split(' ').map(w=>w[0]).join('').toUpperCase(),'Asst. Teacher','NEW',35,[])}]});setAddName('');setAddCode('');};
+
+  const iStyle={padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontSize:12.5};
+  const desOpts=DESIG_OPTIONS.map(d=>({value:d,label:d}));
+
+  const expH=['Code','Name','Designation','Qualifications','Other','Status','Subjects','Max/wk','Classes'];
+  const expR=data.teachers.map(t=>[t.code,t.name,t.designation||'',getQualNames(t),t.otherCourses||'',t.status||'',(t.subjects||[]).map(sId=>{const s=data.subjects.find(x=>x.id===sId);return s?s.code:'';}).join(', '),t.maxPeriods,(t.assignedClasses||[]).map(cId=>{const c=data.classes.find(x=>x.id===cId);return c?c.name:'';}).join(', ')]);
+
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif"><em>Faculty</em> Roster</h1><div className="sub">Click a row to open the profile editor. Selecting a degree auto-suggests subjects. Upload photos for ID cards.</div></div>
+      <ExportBar title="Faculty Roster" headers={expH} rows={expR} subtitle="AY 2026-27"/>
+    </div>
+    <div className="card"><div className="card-title">Quick Add</div><div className="row">
+      <div className="field"><label>Name</label><input value={addName} onChange={e=>setAddName(e.target.value)} placeholder="Full name" onKeyDown={e=>e.key==='Enter'&&quickAdd()}/></div>
+      <div className="field"><label>Code</label><input value={addCode} onChange={e=>setAddCode(e.target.value.toUpperCase())} placeholder="Auto" maxLength={4}/></div>
+      <button className="btn btn-primary" onClick={quickAdd}>Add</button>
+    </div></div>
+    <div className="card" style={{padding:0,overflow:'hidden'}}>{data.teachers.length===0?<div className="empty-state"><h3 className="serif">No faculty</h3></div>:
+      <table><thead><tr><th style={{width:40}}></th><th>Code</th><th>Name</th><th>Desig.</th><th>Qualifications</th><th>Status</th><th>Subjects</th></tr></thead><tbody>
+        {data.teachers.map(t=>(
+          <React.Fragment key={t.id}>
+          <tr style={{cursor:'pointer'}} onClick={()=>editId===t.id?null:startEdit(t)}>
+            <td><div className="avatar">{t.photo?<img src={t.photo} alt=""/>:t.code.slice(0,2)}</div></td>
+            <td><span className="mono" style={{fontWeight:600}}>{t.code}</span></td>
+            <td>{t.name}</td>
+            <td style={{fontSize:12}}>{t.designation||'--'}</td>
+            <td style={{fontSize:12}}>{getQualNames(t)||'--'}</td>
+            <td>{t.status==='NEW'?<span className="badge badge-warn">NEW</span>:<span className="badge badge-ok">OLD</span>}</td>
+            <td><div style={{display:'flex',gap:3,flexWrap:'wrap'}}>{(t.subjects||[]).length===0&&<span style={{color:'var(--ink-muted)',fontSize:11,fontStyle:'italic'}}>none</span>}{(t.subjects||[]).map(sId=>{const s=data.subjects.find(x=>x.id===sId);return s?<span key={sId} className="chip"><span className="chip-color" style={{background:s.color}}></span>{s.code}</span>:null;})}</div></td>
+          </tr>
+          {editId===t.id&&draft&&(
+            <tr><td colSpan={7} style={{background:'var(--bg)',padding:'20px',borderLeft:'3px solid var(--accent)'}} onClick={e=>e.stopPropagation()}>
+              <div style={{display:'flex',gap:20,marginBottom:16}}>
+                <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
+                  <div className="avatar avatar-lg" onClick={handlePhoto}>{draft.photo?<img src={draft.photo} alt=""/>:'+'}</div>
+                  <span style={{fontSize:10,color:'var(--ink-muted)'}}>Click to upload</span>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 80px 1fr 1fr 80px',gap:10,marginBottom:12}}>
+                    <div className="field" style={{margin:0}}><label>Full Name</label><input value={draft.name} onChange={e=>updDraft('name',e.target.value)} style={iStyle}/></div>
+                    <div className="field" style={{margin:0}}><label>Code</label><input value={draft.code} maxLength={4} onChange={e=>updDraft('code',e.target.value.toUpperCase())} style={iStyle}/></div>
+                    <div className="field" style={{margin:0}}><label>Designation</label><SearchSelect value={draft.designation||''} options={[{value:'',label:'--'},...desOpts]} onChange={v=>updDraft('designation',v)}/></div>
+                    <div className="field" style={{margin:0}}><label>Status</label><select value={draft.status||'OLD'} onChange={e=>updDraft('status',e.target.value)} style={iStyle}><option value="OLD">OLD</option><option value="NEW">NEW</option></select></div>
+                    <div className="field" style={{margin:0}}><label>Max/wk</label><input type="number" value={draft.maxPeriods} onChange={e=>updDraft('maxPeriods',Number(e.target.value)||35)} style={{...iStyle,textAlign:'center'}}/></div>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,marginBottom:12}}>
+                    <div className="field" style={{margin:0}}><label>Teacher Type</label><select value={draft.teacherType||'regular'} onChange={e=>updDraft('teacherType',e.target.value)} style={iStyle}><option value="regular">Regular Teacher</option><option value="lecture_based">Lecture Based Teacher</option><option value="activity">Activity Teacher</option></select></div>
+                    {(draft.teacherType==='lecture_based')&&(<><div className="field" style={{margin:0}}><label>Available From</label><input type="time" value={draft.availFrom||''} onChange={e=>updDraft('availFrom',e.target.value)} style={iStyle}/></div>
+                    <div className="field" style={{margin:0}}><label>Available To</label><input type="time" value={draft.availTo||''} onChange={e=>updDraft('availTo',e.target.value)} style={iStyle}/></div></>)}
+                  </div>
+                  {qm.filter(q=>q.cat==='degree').length>0&&(<div style={{marginBottom:12}}>
+                    <label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Degree Qualifications</label>
+                    <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{qm.filter(q=>q.cat==='degree').map(q=>(<button key={q.id} onClick={()=>toggleDraftQual(q.id)} className={(draft.qualifications||[]).includes(q.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{q.name}</button>))}</div>
+                  </div>)}
+                  {qm.filter(q=>q.cat==='professional').length>0&&(<div style={{marginBottom:12}}>
+                    <label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Professional Courses</label>
+                    <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{qm.filter(q=>q.cat==='professional').map(q=>(<button key={q.id} onClick={()=>toggleDraftQual(q.id)} className={(draft.qualifications||[]).includes(q.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{q.name}</button>))}</div>
+                  </div>)}
+                  <div style={{marginBottom:12}}>
+                    <div className="field" style={{margin:0}}><label>Other Courses (free text)</label><input value={draft.otherCourses||''} onChange={e=>updDraft('otherCourses',e.target.value)} placeholder="e.g. Montessori, Jolly Phonics, Abacus" style={iStyle}/></div>
+                  </div>
+                  <div style={{marginBottom:12}}>
+                    <label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Assigned Classes</label>
+                    <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{data.classes.map(c=>(<button key={c.id} onClick={()=>{const arr=draft.assignedClasses||[];updDraft('assignedClasses',arr.includes(c.id)?arr.filter(x=>x!==c.id):[...arr,c.id]);}} className={(draft.assignedClasses||[]).includes(c.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{c.name}</button>))}</div>
+                  </div>
+                </div>
+              </div>
+              <div style={{marginBottom:16}}>
+                <label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Subjects Qualified</label>
+                <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{data.subjects.map(s=>(<button key={s.id} onClick={()=>toggleDraftSubj(s.id)} className={(draft.subjects||[]).includes(s.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'} style={(draft.subjects||[]).includes(s.id)?{background:s.color,borderColor:s.color}:{fontSize:11.5}}>{s.code}</button>))}</div>
+              </div>
+              <div style={{display:'flex',gap:8,justifyContent:'flex-end',borderTop:'1px solid var(--line)',paddingTop:12}}>
+                <button className="btn btn-danger" onClick={()=>deleteTeacher(draft.id)}>Delete</button>
+                <button className="btn btn-ghost" onClick={cancelEdit}>Cancel</button>
+                <button className="btn btn-success" onClick={saveEdit}>Save</button>
+              </div>
+            </td></tr>
+          )}
+          </React.Fragment>
+        ))}
+      </tbody></table>}
+    </div>
+  </div>);
+}
+
+// ===== Subjects =====
+function SubjectsPage({data,update}){
+  const[name,setName]=useState('');const[code,setCode]=useState('');const[color,setColor]=useState('#0d4f3c');const[editId,setEditId]=useState(null);const[subGrp,setSubGrp]=useState('regular');
+  const add=()=>{if(!name.trim())return;update({subjects:[...data.subjects,{id:uid(),name:name.trim(),code:code.trim().toUpperCase()||name.slice(0,3).toUpperCase(),color,subGroup:subGrp,standards:[]}]});setName('');setCode('');setColor('#0d4f3c');};
+  const remove=id=>{setEditId(null);update({subjects:data.subjects.filter(s=>s.id!==id)});};
+  const updS=(sId,patch)=>update({subjects:data.subjects.map(s=>s.id===sId?{...s,...patch}:s)});
+  const toggleStd=(sId,grade)=>{const s=data.subjects.find(x=>x.id===sId);if(!s)return;const stds=s.standards||[];updS(sId,{standards:stds.includes(grade)?stds.filter(x=>x!==grade):[...stds,grade]});};
+  const iStyle={padding:'6px 10px',border:'1px solid var(--line)',borderRadius:5,fontSize:12.5};
+  const sgLabel=g=>g==='graded'?'Graded':g==='activity'?'Activity':'Regular';
+  const sgBadge=g=>g==='graded'?'badge-warn':g==='activity'?'':'badge-ok';
+  const grouped={regular:data.subjects.filter(s=>(s.subGroup||'regular')==='regular'),graded:data.subjects.filter(s=>s.subGroup==='graded'),activity:data.subjects.filter(s=>s.subGroup==='activity')};
+  const expH=['Code','Subject','Sub-Group','Standards','Colour'];
+  const expR=data.subjects.map(s=>[s.code,s.name,sgLabel(s.subGroup||'regular'),(s.standards||[]).length?(s.standards||[]).sort((a,b)=>a-b).join(', '):'All',s.color]);
+  const renderGroup=(label,items)=>{if(!items.length)return null;return(
+    <div style={{marginBottom:16}}>
+      <div style={{fontSize:12,fontWeight:600,color:'var(--ink-soft)',marginBottom:8,textTransform:'uppercase',letterSpacing:'.08em'}}>{label} ({items.length})</div>
+      {items.map(s=>(<React.Fragment key={s.id}>
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'8px 0',borderBottom:'1px solid var(--line-soft)',cursor:'pointer'}} onClick={()=>setEditId(editId===s.id?null:s.id)}>
+          <span className="chip" style={{background:s.color+'22',color:s.color,fontWeight:600,minWidth:50,justifyContent:'center'}}>{s.code}</span>
+          <span style={{flex:1,fontWeight:500}}>{s.name}</span>
+          <span style={{fontSize:11,color:'var(--ink-muted)'}}>{(s.standards||[]).length?'Std '+(s.standards||[]).sort((a,b)=>a-b).join(','):'All'}</span>
+          <button className="btn btn-icon btn-danger" onClick={e=>{e.stopPropagation();remove(s.id);}}>x</button>
+        </div>
+        {editId===s.id&&(
+          <div style={{background:'var(--bg)',padding:'14px 18px',marginBottom:4,borderLeft:'3px solid '+s.color,borderRadius:'0 6px 6px 0'}} onClick={e=>e.stopPropagation()}>
+            <div style={{display:'flex',gap:12,alignItems:'end',flexWrap:'wrap',marginBottom:12}}>
+              <div className="field" style={{margin:0,flex:'1 1 180px'}}><label>Name</label><input value={s.name} onChange={e=>updS(s.id,{name:e.target.value})} style={iStyle}/></div>
+              <div className="field" style={{margin:0,flex:'0 0 80px'}}><label>Code</label><input value={s.code} maxLength={5} onChange={e=>updS(s.id,{code:e.target.value.toUpperCase()})} style={iStyle}/></div>
+              <div className="field" style={{margin:0,flex:'0 0 50px'}}><label>Colour</label><input type="color" value={s.color} onChange={e=>updS(s.id,{color:e.target.value})} style={{height:34,padding:2,border:'1px solid var(--line)',borderRadius:5}}/></div>
+              <div className="field" style={{margin:0,flex:'0 0 120px'}}><label>Sub-Group</label><select value={s.subGroup||'regular'} onChange={e=>updS(s.id,{subGroup:e.target.value})} style={iStyle}><option value="regular">Regular</option><option value="graded">Graded</option><option value="activity">Activity</option></select></div>
+            </div>
+            <div><label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Applicable Standards (empty = all)</label>
+              <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+                {[0,1,2,3,4,5,6,7,8,9,10].map(g=>(<button key={g} onClick={()=>toggleStd(s.id,g)} className={(s.standards||[]).includes(g)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{g===0?'Pre-Pri':'Std '+g}</button>))}
+                <button className="btn btn-ghost btn-sm" style={{marginLeft:8,fontSize:11,color:'var(--ink-muted)'}} onClick={()=>updS(s.id,{standards:[]})}>Clear (= All)</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </React.Fragment>))}
+    </div>
+  );};
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif"><em>Subjects</em></h1><div className="sub">Subjects are grouped as Regular, Graded, and Activity. Assign applicable standards so they only appear in relevant class timetables.</div></div>
+      <ExportBar title="Subjects" headers={expH} rows={expR}/>
+    </div>
+    <div className="card"><div className="card-title">Add New Subject</div><div className="row">
+      <div className="field"><label>Name</label><input placeholder="Sanskrit" value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==='Enter'&&add()}/></div>
+      <div className="field"><label>Code</label><input placeholder="SAN" maxLength={5} value={code} onChange={e=>setCode(e.target.value.toUpperCase())}/></div>
+      <div className="field"><label>Sub-Group</label><select value={subGrp} onChange={e=>setSubGrp(e.target.value)}><option value="regular">Regular</option><option value="graded">Graded</option><option value="activity">Activity</option></select></div>
+      <div className="field"><label>Colour</label><input type="color" value={color} onChange={e=>setColor(e.target.value)} style={{height:38,padding:2}}/></div>
+      <button className="btn btn-primary" onClick={add}>Add</button>
+    </div></div>
+    <div className="card">
+      {renderGroup('Regular Subjects',grouped.regular)}
+      {renderGroup('Graded Subjects',grouped.graded)}
+      {renderGroup('Activity',grouped.activity)}
+    </div>
+  </div>);
+}
+
+// ===== Allocations =====
+function AllocatePage({data,update}){
+  const setA=(c,s,t)=>{const a={...data.allocations};if(t)a[allocKey(c,s)]=t;else delete a[allocKey(c,s)];update({allocations:a});};
+  const[bulkSubj,setBulkSubj]=useState('');const[bulkTeacher,setBulkTeacher]=useState('');const[bulkClasses,setBulkClasses]=useState([]);
+  const toggleBulkClass=cId=>setBulkClasses(a=>a.includes(cId)?a.filter(x=>x!==cId):[...a,cId]);
+  const bulkAssign=()=>{if(!bulkSubj||!bulkTeacher||!bulkClasses.length)return;const a={...data.allocations};bulkClasses.forEach(cId=>{a[allocKey(cId,bulkSubj)]=bulkTeacher;});update({allocations:a});setBulkClasses([]);};
+  const getSubjectsForClass=(cls)=>{const grade=cls.grade||0;return data.subjects.filter(s=>!(s.standards||[]).length||(s.standards||[]).includes(grade));};
+
+  if(!data.classes.length||!data.teachers.length)return<div><div className="pagehead"><div><h1 className="serif"><em>Allocations</em></h1></div></div><div className="card"><div className="empty-state"><h3>Add classes & teachers first</h3></div></div></div>;
+
+  const allSubjIds=[...new Set(data.classes.flatMap(c=>getSubjectsForClass(c).map(s=>s.id)))];
+  const visibleSubjects=data.subjects.filter(s=>allSubjIds.includes(s.id));
+  const expH=['Class',...visibleSubjects.map(s=>s.code)];
+  const expR=data.classes.map(c=>{const applicable=getSubjectsForClass(c);return[c.name,...visibleSubjects.map(s=>{if(!applicable.find(x=>x.id===s.id))return'–';const tId=data.allocations[allocKey(c.id,s.id)];const t=tId?data.teachers.find(x=>x.id===tId):null;return t?t.code:'';})];});
+  const subjOpts=data.subjects.map(s=>({value:s.id,label:s.code+' – '+s.name}));
+  const teacherOpts=data.teachers.map(t=>({value:t.id,label:t.code+' – '+t.name}));
+
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif">Subject <em>Allocations</em></h1><div className="sub">Subjects auto-filter by standard. Use bulk assign to allocate one teacher across multiple classes at once.</div></div>
+      <ExportBar title="Subject Allocations" headers={expH} rows={expR}/>
+    </div>
+    <div className="card"><div className="card-title">Bulk Assign</div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+        <div className="field" style={{margin:0}}><label>Subject</label><SearchSelect value={bulkSubj} options={[{value:'',label:'-- Select Subject --'},...subjOpts]} onChange={setBulkSubj}/></div>
+        <div className="field" style={{margin:0}}><label>Teacher</label><SearchSelect value={bulkTeacher} options={[{value:'',label:'-- Select Teacher --'},...teacherOpts]} onChange={setBulkTeacher}/></div>
+      </div>
+      <div style={{marginBottom:12}}>
+        <label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Assign to Classes</label>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap'}}>
+          {data.classes.filter(c=>{if(!bulkSubj)return true;const subj=data.subjects.find(s=>s.id===bulkSubj);if(!subj)return true;return!(subj.standards||[]).length||(subj.standards||[]).includes(c.grade||0);}).map(c=>(<button key={c.id} onClick={()=>toggleBulkClass(c.id)} className={bulkClasses.includes(c.id)?'btn btn-primary btn-sm':'btn btn-ghost btn-sm'}>{c.name}</button>))}
+        </div>
+      </div>
+      <button className="btn btn-success" onClick={bulkAssign} disabled={!bulkSubj||!bulkTeacher||!bulkClasses.length}>Assign to {bulkClasses.length} class{bulkClasses.length!==1?'es':''}</button>
+    </div>
+    <div className="card" style={{padding:0,overflow:'auto'}}><table><thead><tr><th style={{position:'sticky',left:0,background:'var(--paper)',zIndex:2}}>Class</th>
+      {visibleSubjects.map(s=>(<th key={s.id} style={{minWidth:100}}><span className="chip" style={{background:s.color+'22',color:s.color}}>{s.code}</span></th>))}</tr></thead>
+      <tbody>{data.classes.map(c=>{const applicable=getSubjectsForClass(c);return(<tr key={c.id}><td style={{position:'sticky',left:0,background:'var(--paper)',fontWeight:600,zIndex:1,fontSize:12}}>{c.name}</td>
+        {visibleSubjects.map(s=>{
+          if(!applicable.find(x=>x.id===s.id)) return<td key={s.id} style={{background:'var(--line-soft)',textAlign:'center',color:'var(--ink-muted)',fontSize:11}}>–</td>;
+          const tId=data.allocations[allocKey(c.id,s.id)];const eligible=data.teachers.filter(t=>!t.subjects||!t.subjects.length||t.subjects.includes(s.id));
+          const opts=[{value:'',label:'--'},...eligible.map(t=>({value:t.id,label:t.code}))];
+          return<td key={s.id}><SearchSelect value={tId||''} options={opts} onChange={v=>setA(c.id,s.id,v)} style={{minWidth:80}}/></td>;
+        })}</tr>);})}</tbody></table></div>
+  </div>);
+}
+
+// ===== Timetable =====
+function TimetablePage({data,update}){
+  const[classId,setClassId]=useState(data.classes[0]?data.classes[0].id:'');const[picker,setPicker]=useState(null);
+  const conflicts=useMemo(()=>findConflicts(data.timetable,data.classes,data.school),[data.timetable,data.classes,data.school]);
+  useEffect(()=>{if(!classId&&data.classes[0])setClassId(data.classes[0].id);},[data.classes,classId]);
+
+  // Session switcher
+  const switchSession=k=>{const pr=SESSION_PRESETS[k];update({school:{...data.school,activeSession:k,preprimaryPeriods:buildSessionPeriods(pr.preprimary),primaryPeriods:buildSessionPeriods(pr.primary),upperPeriods:buildSessionPeriods(pr.upper),preprimaryStart:pr.preprimary.startTime,primaryStart:pr.primary.startTime,upperStart:pr.upper.startTime}});};
+  const activeSession=data.school.activeSession||'normal';
+
+  if(!data.classes.length)return<div><div className="pagehead"><div><h1 className="serif"><em>Timetable</em></h1></div></div><div className="card"><div className="empty-state"><h3>Add classes first</h3></div></div></div>;
+  const cls=data.classes.find(c=>c.id===classId);const pList=cls?getPeriodsForClass(data.school,cls):data.school.primaryPeriods;const tCount=getTeachingCount(pList);
+  const setCell=(sId,roomId)=>{if(!picker)return;const tId=sId?data.allocations[allocKey(classId,sId)]:null;const tt=JSON.parse(JSON.stringify(data.timetable));if(!tt[classId])tt[classId]={};if(!tt[classId][picker.d])tt[classId][picker.d]={};if(sId)tt[classId][picker.d][picker.p]={subjectId:sId,teacherId:tId||null,roomId:roomId||null};else delete tt[classId][picker.d][picker.p];update({timetable:tt});setPicker(null);};
+  const clearClass=()=>{if(!confirm('Clear?'))return;const tt={...data.timetable};delete tt[classId];update({timetable:tt});};
+
+  // Conflict-aware auto-fill: checks if teacher is already busy before placing
+  const autoFill=()=>{
+    const al=Object.entries(data.allocations).filter(([k])=>k.startsWith(classId+'|'));
+    if(!al.length){alert('No allocations for this class.');return;}
+    const ws=tCount*data.school.days.length;
+    const cnt={};const ps=Math.floor(ws/al.length);
+    al.forEach(([k])=>cnt[k.split('|')[1]]=ps);
+    let rem=ws-ps*al.length;
+    al.forEach(([k])=>{if(rem>0){cnt[k.split('|')[1]]++;rem--;}});
+    // Build pool of {subjectId, teacherId} items
+    const pool=[];
+    Object.entries(cnt).forEach(([sId,n])=>{
+      const tId=data.allocations[allocKey(classId,sId)]||null;
+      for(let i=0;i<n;i++) pool.push({subjectId:sId,teacherId:tId});
+    });
+    // Shuffle
+    for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+    // Build a busy map: for each (dayIdx, periodStart-End), which teacherIds are occupied
+    const busyMap={};
+    data.classes.forEach(c=>{
+      if(c.id===classId) return; // skip the class we're filling
+      const cPList=getPeriodsForClass(data.school,c);
+      const cTT=data.timetable[c.id]||{};
+      Object.keys(cTT).forEach(dIdx=>{
+        Object.keys(cTT[dIdx]||{}).forEach(pIdx=>{
+          const cell=cTT[dIdx][pIdx];
+          if(!cell||!cell.teacherId) return;
+          const p=cPList[Number(pIdx)];
+          if(!p||isNonTeaching(p)) return;
+          const key=dIdx+'|'+p.start+'|'+p.end;
+          if(!busyMap[key]) busyMap[key]=new Set();
+          busyMap[key].add(cell.teacherId);
+        });
+      });
+    });
+    // Get teaching positions for this class
+    const positions=[];
+    data.school.days.forEach((_,dIdx)=>{
+      pList.forEach((p,pIdx)=>{if(!isNonTeaching(p)) positions.push({dIdx,pIdx,start:p.start,end:p.end});});
+    });
+    const tt=JSON.parse(JSON.stringify(data.timetable));
+    if(!tt[classId]) tt[classId]={};
+    // Also track what we place in this run so we don't self-conflict
+    const placed={};
+    let skipped=0;
+    const poolCopy=[...pool];
+    // Helper: check if lecture-based teacher is available at this time
+    const isTeacherAvailable=(tId,start,end)=>{
+      const t=data.teachers.find(x=>x.id===tId);
+      if(!t||t.teacherType!=='lecture_based') return true;
+      if(!t.availFrom||!t.availTo) return true;
+      return start>=t.availFrom&&end<=t.availTo;
+    };
+    // First lecture of each day = class teacher
+    const classTeacherId=cls?cls.classTeacherId:null;
+    const firstPosPerDay={};
+    positions.forEach(pos=>{if(firstPosPerDay[pos.dIdx]===undefined)firstPosPerDay[pos.dIdx]=pos;});
+
+    positions.forEach(({dIdx,pIdx,start,end})=>{
+      const busyKey=dIdx+'|'+start+'|'+end;
+      const busySet=busyMap[busyKey]||new Set();
+      const selfBusy=placed[busyKey]||new Set();
+      // First teaching period of each day: prefer class teacher's subject
+      const isFirstPeriod=firstPosPerDay[dIdx]&&firstPosPerDay[dIdx].pIdx===pIdx;
+      if(isFirstPeriod&&classTeacherId&&poolCopy.length>0){
+        const ctIdx=poolCopy.findIndex(item=>item.teacherId===classTeacherId&&!busySet.has(item.teacherId)&&!selfBusy.has(item.teacherId)&&isTeacherAvailable(item.teacherId,start,end));
+        if(ctIdx!==-1){
+          const item=poolCopy.splice(ctIdx,1)[0];
+          if(!tt[classId][dIdx]) tt[classId][dIdx]={};
+          tt[classId][dIdx][pIdx]={subjectId:item.subjectId,teacherId:item.teacherId,roomId:null};
+          if(item.teacherId){if(!placed[busyKey])placed[busyKey]=new Set();placed[busyKey].add(item.teacherId);}
+          return;
+        }
+      }
+      // Find first item from pool whose teacher is NOT busy and is available
+      let found=-1;
+      for(let i=0;i<poolCopy.length;i++){
+        const item=poolCopy[i];
+        if(!item.teacherId || (!busySet.has(item.teacherId)&&!selfBusy.has(item.teacherId)&&isTeacherAvailable(item.teacherId,start,end))){
+          found=i;break;
+        }
+      }
+      if(found===-1){
+        if(poolCopy.length>0){
+          const item=poolCopy.splice(0,1)[0];
+          if(!tt[classId][dIdx]) tt[classId][dIdx]={};
+          tt[classId][dIdx][pIdx]={subjectId:item.subjectId,teacherId:null,roomId:null};
+          skipped++;
+        }
+        return;
+      }
+      const item=poolCopy.splice(found,1)[0];
+      if(!tt[classId][dIdx]) tt[classId][dIdx]={};
+      tt[classId][dIdx][pIdx]={subjectId:item.subjectId,teacherId:item.teacherId,roomId:null};
+      if(item.teacherId){
+        if(!placed[busyKey]) placed[busyKey]=new Set();
+        placed[busyKey].add(item.teacherId);
+      }
+    });
+    update({timetable:tt});
+    if(skipped>0) alert(skipped+' slot(s) had all teachers busy — placed subject without teacher. Review manually.');
+  };
+
+  const clsOpts=data.classes.map(c=>({value:c.id,label:c.name+' ('+(c.group==='preprimary'?'Pre-Pri':c.group==='upper'?'Upper':'Primary')+')'}));
+  const ttExpH=['Period',...data.school.days.map(d=>d.slice(0,3))];
+  const ttExpR=pList.map((p,pi)=>[p.name+' ('+p.start+'–'+p.end+')',...data.school.days.map((_,di)=>{if(isNonTeaching(p))return p.name;const cell=data.timetable[classId]&&data.timetable[classId][di]&&data.timetable[classId][di][pi];if(!cell)return'';const subj=data.subjects.find(s=>s.id===cell.subjectId);const teacher=data.teachers.find(t=>t.id===cell.teacherId);const room=cell.roomId?(data.rooms||[]).find(r=>r.id===cell.roomId):null;return(subj?subj.code:'')+(teacher?' ('+teacher.code+')':'')+(room?' ['+room.name+']':'');})]);
+  const totalTeachMin=pList.filter(p=>!isNonTeaching(p)).reduce((s,p)=>s+(p.duration||0),0);
+  const totalDayMin=pList.reduce((s,p)=>s+(p.duration||0),0);
+  const conflictCount=Object.keys(conflicts).filter(k=>k.startsWith(classId+'|')).length;
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif"><em>Timetable</em> Builder</h1><div className="sub">Red dot = teacher conflict. Yellow dot = room conflict. Auto-fill is conflict-aware.</div></div><div className="actions">
+      <ExportBar title={'Timetable – '+(cls?cls.name:'')} headers={ttExpH} rows={ttExpR} subtitle={cls?cls.name:''}/>
+      <button className="btn btn-ghost" onClick={autoFill}>Auto-fill</button><button className="btn btn-danger" onClick={clearClass}>Clear</button></div></div>
+
+    <div className="card no-print" style={{padding:'14px 20px',marginBottom:16}}>
+      <div style={{display:'flex',alignItems:'center',gap:16,flexWrap:'wrap'}}>
+        <span style={{fontSize:11,fontWeight:500,color:'var(--ink-muted)',textTransform:'uppercase',letterSpacing:'.1em'}}>Session:</span>
+        <div className="tab-bar">
+          {Object.entries(SESSION_PRESETS).map(([k,pr])=>(<button key={k} className={`tab-btn ${activeSession===k?'active':''}`} onClick={()=>switchSession(k)}>{pr.label}</button>))}
+        </div>
+        <span style={{fontSize:12,color:'var(--ink-muted)'}}>Teaching: {totalTeachMin} min | Day: {totalDayMin} min ({Math.floor(totalDayMin/60)}h {totalDayMin%60}m)</span>
+        {conflictCount>0&&<span className="badge badge-err">{conflictCount} conflicts</span>}
+      </div>
+    </div>
+
+    <div className="tt-toolbar"><SearchSelect value={classId} options={clsOpts} onChange={setClassId} style={{minWidth:240}}/>
+      {cls&&<span className={`badge ${cls.group==='preprimary'?'':cls.group==='primary'?'badge-ok':'badge-warn'}`}>{cls.group==='preprimary'?'PRE-PRIMARY':cls.group==='primary'?'PRIMARY':'UPPER'}</span>}
+      <span style={{color:'var(--ink-muted)',fontSize:12.5}}>{Object.values(data.timetable[classId]||{}).reduce((s,d)=>s+Object.keys(d).length,0)}/{tCount*data.school.days.length} slots</span>
+    </div>
+    <div className="tt-grid" style={{'--cols':data.school.days.length}}>
+      <div className="tt-row"><div className="tt-cell header">Period</div>{data.school.days.map(d=><div key={d} className="tt-cell header">{d.slice(0,3)}</div>)}</div>
+      {pList.map((p,pi)=>(<div className="tt-row" key={pi}><div className="tt-cell time"><div style={{fontWeight:600,color:'var(--ink-soft)',fontSize:11}}>{p.name}</div><div>{p.start}–{p.end}</div></div>
+        {data.school.days.map((_,di)=>{
+          if(p.isBreak)return<div key={di} className="tt-cell break">{p.name}</div>;
+          if(p.isAssembly)return<div key={di} className="tt-cell assembly">{p.name}</div>;
+          if(p.isOrientation)return<div key={di} className="tt-cell orientation">{p.name}</div>;
+          const cell=data.timetable[classId]&&data.timetable[classId][di]&&data.timetable[classId][di][pi];
+          const subj=cell?data.subjects.find(s=>s.id===cell.subjectId):null;const teacher=cell?data.teachers.find(t=>t.id===cell.teacherId):null;
+          const conType=conflicts[`${classId}|${di}|${pi}`];
+          const conClass=conType==='teacher'||conType==='both'?'conflict':conType==='room'?'room-conflict':'';
+          return<div key={di} className={`tt-cell ${!cell?'empty':''} ${conClass}`} style={subj?{background:subj.color+'10',borderLeft:`3px solid ${subj.color}`}:{}} onClick={()=>setPicker({d:di,p:pi})}>{cell&&subj?(<><div className="subj"><span className="chip-color" style={{background:subj.color}}></span>{subj.code}</div><div className="teach">{teacher?teacher.code:'--'}</div></>):'+ assign'}</div>;
+        })}</div>))}
+    </div>
+    {picker&&<Picker data={data} classId={classId} picker={picker} pList={pList} onClose={()=>setPicker(null)} onPick={setCell}/>}
+  </div>);
+}
+function Picker({data,classId,picker,pList,onClose,onPick}){
+  const p=pList[picker.p];const day=data.school.days[picker.d];
+  const currentCell=data.timetable[classId]&&data.timetable[classId][picker.d]&&data.timetable[classId][picker.d][picker.p];
+  const[selRoom,setSelRoom]=useState(currentCell&&currentCell.roomId?currentCell.roomId:'');
+  const roomOpts=[{value:'',label:'-- No Room --'},...(data.rooms||[]).map(r=>({value:r.id,label:r.name}))];
+  return(<div className="modal-bg" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()}>
+    <div className="modal-head"><div style={{fontSize:11,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--ink-muted)',marginBottom:4}}>{day} · {p.name} ({p.start}–{p.end})</div><h3 className="serif">Pick a <em>subject</em></h3></div>
+    <div className="modal-body">
+      <div style={{marginBottom:12}}><label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Room / Location</label>
+        <SearchSelect value={selRoom} options={roomOpts} onChange={setSelRoom} placeholder="Select room..."/>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+      {data.subjects.map(s=>{const tId=data.allocations[allocKey(classId,s.id)];const teacher=tId?data.teachers.find(x=>x.id===tId):null;
+        return<button key={s.id} onClick={()=>onPick(s.id,selRoom)} style={{textAlign:'left',padding:'10px 12px',border:'1px solid var(--line)',borderRadius:6,background:s.color+'10',borderLeft:`3px solid ${s.color}`,cursor:'pointer'}}><div style={{fontWeight:600,fontSize:13}}>{s.name}</div><div style={{fontSize:11,color:'var(--ink-muted)',marginTop:2}}>{teacher?teacher.code+' · '+teacher.name:'unallocated'}</div></button>;
+      })}</div>
+    </div>
+    <div className="modal-foot"><button className="btn btn-danger" onClick={()=>onPick(null,null)}>Clear</button><button className="btn btn-ghost" onClick={onClose}>Cancel</button></div>
+  </div></div>);
+}
+
+// ===== Teacher Load =====
+function LoadPage({data}){
+  const priT=getTeachingCount(data.school.primaryPeriods);const upT=getTeachingCount(data.school.upperPeriods||data.school.primaryPeriods);
+  const loads=useMemo(()=>data.teachers.map(t=>({teacher:t,...teacherLoad(t,data.timetable,data.classes,data.school)})),[data]);
+  const[selTeacher,setSelTeacher]=useState('');const[view,setView]=useState('weekly');
+  if(!data.teachers.length)return<div><div className="pagehead"><div><h1 className="serif"><em>Teacher Load</em></h1></div></div><div className="card"><div className="empty-state"><h3>No faculty</h3></div></div></div>;
+  const sorted=[...loads].sort((a,b)=>b.total-a.total);const over=loads.filter(l=>l.total>l.teacher.maxPeriods).length;const avg=loads.length?Math.round(loads.reduce((s,l)=>s+l.total,0)/loads.length):0;
+  // Subject-wise with duration
+  const getSubjDuration=(load)=>{
+    return Object.entries(load.bySubject).map(([sId,count])=>{
+      const s=data.subjects.find(x=>x.id===sId);if(!s)return null;
+      // Avg period duration from all class grids
+      let totalDur=0,cnt=0;
+      data.classes.forEach(cls=>{const pl=getPeriodsForClass(data.school,cls);pl.filter(p=>!isNonTeaching(p)).forEach(p=>{totalDur+=(p.duration||35);cnt++;});});
+      const avgDur=cnt?Math.round(totalDur/cnt):35;
+      return{code:s.code,name:s.name,color:s.color,count,duration:count*avgDur};
+    }).filter(Boolean);
+  };
+  // Personal timetable for selected teacher
+  const selT=data.teachers.find(t=>t.id===selTeacher);
+  const tOpts=[{value:'',label:'-- Select Teacher --'},...data.teachers.map(t=>({value:t.id,label:t.code+' – '+t.name}))];
+  const ldExpH=['Code','Name','Total','Max','Status','Subjects (count × min)','Classes'];
+  const ldExpR=sorted.map(l=>[l.teacher.code,l.teacher.name,l.total,l.teacher.maxPeriods,l.total>l.teacher.maxPeriods?'OVER':'OK',getSubjDuration(l).map(s=>s.code+': '+s.count+'×'+(s.duration/s.count)+'m='+s.duration+'m').join(', '),Object.entries(l.byClass).map(([cId,n])=>{const c=data.classes.find(x=>x.id===cId);return c?c.name+'·'+n:'';}).join(', ')]);
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif">Teacher <em>Workload</em></h1></div>
+      <ExportBar title="Teacher Workload" headers={ldExpH} rows={ldExpR}/>
+    </div>
+    <div className="grid-4" style={{marginBottom:24}}>
+      <div className="stat"><div className="label">Avg Load</div><div className="val">{avg}</div><div className="delta">periods/week</div></div>
+      <div className="stat"><div className="label">Periods/day</div><div className="val" style={{fontSize:24}}>{priT}P / {upT}U</div></div>
+      <div className="stat"><div className="label">Overloaded</div><div className="val" style={{color:over?'var(--danger)':'var(--ink)'}}>{over}</div></div>
+      <div className="stat"><div className="label">Faculty</div><div className="val">{data.teachers.length}</div></div>
+    </div>
+    <div className="card"><div className="card-title">Distribution with Duration</div>
+      {sorted.map(l=>{const pct=(l.total/l.teacher.maxPeriods)*100;const cls2=pct>100?'over':pct>=85?'full':pct>=50?'':'warn';const st=pct>100?'OVER':pct>=85?'FULL':pct>=50?'OK':'LOW';const sb=pct>100?'badge-err':pct>=85?'badge-ok':pct>=50?'':'badge-warn';
+        const subjDur=getSubjDuration(l);
+        return<div key={l.teacher.id} style={{marginBottom:16,paddingBottom:12,borderBottom:'1px solid var(--line-soft)'}}>
+          <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:4}}><div><span style={{fontWeight:600}}>{l.teacher.name}</span><span className="mono" style={{color:'var(--ink-muted)',marginLeft:8,fontSize:12}}>{l.teacher.code}</span>{l.teacher.teacherType!=='regular'&&<span className="badge" style={{marginLeft:6}}>{l.teacher.teacherType==='lecture_based'?'LEC':'ACT'}</span>}</div><div style={{display:'flex',alignItems:'center',gap:12}}><span className="mono" style={{fontSize:13}}>{l.total}/{l.teacher.maxPeriods}</span><span className={`badge ${sb}`}>{st}</span></div></div>
+          <div className="load-bar"><div className={`load-fill ${cls2}`} style={{width:Math.min(pct,100)+'%'}}></div></div>
+          {subjDur.length>0&&<div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:6}}>{subjDur.map(sd=>(<span key={sd.code} className="chip" style={{background:sd.color+'18',color:sd.color,fontSize:11}}><span className="chip-color" style={{background:sd.color}}></span>{sd.code}: {sd.count} × {Math.round(sd.duration/sd.count)}m = {sd.duration}m</span>))}</div>}
+        </div>;
+      })}
+    </div>
+    <div className="card">
+      <div className="card-title">Personal Timetable</div>
+      <div style={{display:'flex',gap:12,alignItems:'center',marginBottom:16,flexWrap:'wrap'}}>
+        <SearchSelect value={selTeacher} options={tOpts} onChange={setSelTeacher} style={{minWidth:260}}/>
+        <div className="tab-bar"><button className={`tab-btn ${view==='daily'?'active':''}`} onClick={()=>setView('daily')}>Daily</button><button className={`tab-btn ${view==='weekly'?'active':''}`} onClick={()=>setView('weekly')}>Weekly</button></div>
+      </div>
+      {selT?(()=>{
+        if(view==='daily'){
+          return data.school.days.map((day,dIdx)=>{
+            const sched=getTeacherScheduleForDay(selT.id,dIdx,data.timetable,data.classes,data.school);
+            if(!sched.length)return<div key={dIdx} style={{marginBottom:8,color:'var(--ink-muted)',fontSize:13}}><strong>{day}</strong>: Free</div>;
+            return<div key={dIdx} style={{marginBottom:12}}><div style={{fontWeight:600,marginBottom:4}}>{day} ({sched.length} periods)</div>
+              <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{sched.map((sl,i)=>{const subj=data.subjects.find(s=>s.id===sl.subjectId);return<span key={i} className="chip" style={{background:subj?subj.color+'18':'',color:subj?subj.color:''}}>{sl.start}–{sl.end} | {sl.className} | {subj?subj.code:'?'}</span>;})}</div>
+            </div>;
+          });
+        }
+        // Weekly grid view
+        const allPeriodSets=data.classes.map(c=>getPeriodsForClass(data.school,c));
+        const maxPeriods=Math.max(...allPeriodSets.map(p=>p.length));
+        return<div style={{overflowX:'auto'}}><table><thead><tr><th>Period</th>{data.school.days.map(d=><th key={d}>{d.slice(0,3)}</th>)}</tr></thead><tbody>
+          {Array.from({length:maxPeriods}).map((_,pi)=>(<tr key={pi}><td className="mono" style={{fontSize:12,color:'var(--ink-muted)'}}>{pi+1}</td>
+            {data.school.days.map((d,di)=>{
+              const sched=getTeacherScheduleForDay(selT.id,di,data.timetable,data.classes,data.school);
+              const slot=sched.find(s=>s.periodIdx===pi);
+              if(!slot)return<td key={di} style={{color:'var(--ink-muted)',fontSize:12}}>–</td>;
+              const subj=data.subjects.find(s=>s.id===slot.subjectId);
+              return<td key={di} style={{fontSize:12,background:subj?subj.color+'10':''}}><strong>{subj?subj.code:'?'}</strong><br/><span style={{fontSize:10,color:'var(--ink-muted)'}}>{slot.className}</span></td>;
+            })}</tr>))}
+        </tbody></table></div>;
+      })():<div style={{color:'var(--ink-muted)',fontStyle:'italic',padding:'12px 0'}}>Select a teacher to view their personal timetable.</div>}
+    </div>
+  </div>);
+}
+
+// ===== Proxy Management =====
+function ProxyPage({data,update}){
+  const[dayIdx,setDayIdx]=useState(0);const[absentIds,setAbsentIds]=useState([]);const[assignments,setAssignments]=useState({});
+  const toggleAbsent=id=>setAbsentIds(a=>a.includes(id)?a.filter(x=>x!==id):[...a,id]);
+
+  // Build absent teachers' schedules for the selected day
+  const absentSchedules=useMemo(()=>{
+    return absentIds.map(tId=>{const t=data.teachers.find(x=>x.id===tId);if(!t)return null;
+      const sched=getTeacherScheduleForDay(tId,dayIdx,data.timetable,data.classes,data.school);
+      return{teacher:t,schedule:sched};
+    }).filter(Boolean);
+  },[absentIds,dayIdx,data]);
+
+  const assignProxy=(slotKey,proxyId)=>setAssignments(a=>({...a,[slotKey]:proxyId}));
+
+  const printProxySlips=()=>{
+    // Gather proxy assignments per proxy teacher
+    const byProxy={};
+    Object.entries(assignments).forEach(([key,proxyId])=>{if(!proxyId)return;
+      const[absentId,pStart,pEnd,classId]=key.split('|');
+      const absent=data.teachers.find(t=>t.id===absentId);const proxy=data.teachers.find(t=>t.id===proxyId);
+      const cls=data.classes.find(c=>c.id===classId);const subj=data.subjects.find(s=>s.id===key.split('|')[4]);
+      if(!proxy)return;if(!byProxy[proxyId])byProxy[proxyId]={teacher:proxy,slots:[]};
+      byProxy[proxyId].slots.push({start:pStart,end:pEnd,className:cls?cls.name:'?',subjectName:subj?subj.name:'?',absentName:absent?absent.name:'?'});
+    });
+    // Open print window
+    const dayName=data.school.days[dayIdx];const date=new Date().toLocaleDateString('en-IN');
+    let html='<html><head><title>Proxy Slips</title><style>body{font-family:Arial,sans-serif;padding:20px}h2{margin:0 0 4px}table{width:100%;border-collapse:collapse;margin:8px 0 24px}th,td{border:1px solid #999;padding:8px;text-align:left;font-size:13px}th{background:#f0f0f0}.slip{page-break-after:always;padding:20px;border:2px solid #333;margin-bottom:24px;border-radius:8px}@media print{.slip{page-break-after:always}}</style></head><body>';
+    html+='<div style="text-align:center;margin-bottom:20px"><h1>The World School, ICSE — Proxy Schedule</h1><p>'+dayName+' · '+date+'</p></div>';
+    Object.values(byProxy).forEach(({teacher:pr,slots})=>{
+      html+='<div class="slip"><h2>Proxy Slip for: '+pr.name+' ('+pr.code+')</h2><p style="color:#666;margin-bottom:8px">'+dayName+' · '+date+'</p><table><tr><th>Time</th><th>Class</th><th>Subject</th><th>Absent Teacher</th></tr>';
+      slots.sort((a,b)=>a.start.localeCompare(b.start)).forEach(s=>{html+='<tr><td>'+s.start+'–'+s.end+'</td><td>'+s.className+'</td><td>'+s.subjectName+'</td><td>'+s.absentName+'</td></tr>';});
+      html+='</table><div style="margin-top:24px;display:flex;justify-content:space-between"><div>Signature of Proxy Teacher: _______________</div><div>Coordinator: _______________</div></div></div>';
+    });
+    html+='</body></html>';
+    const w=window.open('','_blank');w.document.write(html);w.document.close();w.print();
+  };
+
+  const printConsolidatedReport=()=>{
+    const dayName=data.school.days[dayIdx];const date=new Date().toLocaleDateString('en-IN');
+    const allAssigned=Object.entries(assignments).filter(([k,v])=>v).map(([key,proxyId])=>{
+      const parts=key.split('|');const absent=data.teachers.find(t=>t.id===parts[0]);const proxy=data.teachers.find(t=>t.id===proxyId);
+      const cls=data.classes.find(c=>c.id===parts[3]);const subj=data.subjects.find(s=>s.id===parts[4]);
+      return{proxyName:proxy?proxy.name:'?',proxyCode:proxy?proxy.code:'?',start:parts[1],end:parts[2],className:cls?cls.name:'?',subjectName:subj?subj.name:'?',absentName:absent?absent.name:'?'};
+    }).sort((a,b)=>a.start.localeCompare(b.start));
+    let html='<html><head><title>Consolidated Proxy Report</title><style>body{font-family:Arial,sans-serif;padding:24px}table{width:100%;border-collapse:collapse;margin:12px 0}th,td{border:1px solid #999;padding:8px 10px;text-align:left;font-size:13px}th{background:#f0f0f0}.note{margin-top:24px;padding:12px;background:#fffde7;border:1px solid #fdd835;border-radius:6px;font-size:12px;color:#5d4037}</style></head><body>';
+    html+='<div style="text-align:center;margin-bottom:16px"><h1 style="margin:0">The World School, ICSE – Bhusawal</h1><h2 style="margin:4px 0;font-weight:400">Consolidated Proxy Report</h2><p style="color:#666">'+dayName+' · '+date+'</p></div>';
+    html+='<table><thead><tr><th>Sr.</th><th>Proxy Teacher</th><th>Period</th><th>Class</th><th>Subject</th><th>Absent Teacher</th><th>Signature</th></tr></thead><tbody>';
+    allAssigned.forEach((a,i)=>{html+='<tr><td>'+(i+1)+'</td><td>'+a.proxyName+' ('+a.proxyCode+')</td><td>'+a.start+'–'+a.end+'</td><td>'+a.className+'</td><td>'+a.subjectName+'</td><td>'+a.absentName+'</td><td style="min-width:100px"></td></tr>';});
+    html+='</tbody></table>';
+    html+='<div class="note"><strong>Note:</strong> A scanned copy of this report is to be shared with the HR over mail by the Supervisor.</div>';
+    html+='<div style="margin-top:32px;display:flex;justify-content:space-between"><div>Prepared by: _______________<br/><small>Supervisor</small></div><div>Received by: _______________<br/><small>HR</small></div><div>Date: '+date+'</div></div>';
+    html+='</body></html>';
+    const w=window.open('','_blank');w.document.write(html);w.document.close();w.print();
+  };
+
+  const dayOpts=data.school.days.map((d,i)=>({value:String(i),label:d}));
+  const teacherOpts=data.teachers.map(t=>({value:t.id,label:t.code+' – '+t.name}));
+
+  return(<div>
+    <div className="pagehead"><div><h1 className="serif">Proxy <em>Management</em></h1><div className="sub">Mark absent teachers, view their schedule, assign free substitutes, and print reports.</div></div>
+      {Object.keys(assignments).filter(k=>assignments[k]).length>0&&<div className="actions"><button className="btn btn-ghost" onClick={printConsolidatedReport}>Consolidated Report</button><button className="btn btn-primary" onClick={printProxySlips}>Print Proxy Slips</button></div>}
+    </div>
+
+    <div className="card">
+      <div className="grid-2">
+        <div className="field"><label>Day</label><SearchSelect value={String(dayIdx)} options={dayOpts} onChange={v=>setDayIdx(Number(v))}/></div>
+        <div className="field"><label>Add Absent Teacher</label>
+          <SearchSelect value="" options={[{value:'',label:'-- Select teacher --'},...data.teachers.filter(t=>!absentIds.includes(t.id)).map(t=>({value:t.id,label:t.code+' – '+t.name}))]} onChange={v=>{if(v)setAbsentIds(a=>[...a,v])}} placeholder="Search by name or code..."/>
+        </div>
+      </div>
+      {absentIds.length>0&&(<div style={{marginTop:12}}>
+        <label style={{display:'block',fontSize:11,letterSpacing:'.06em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:500,marginBottom:6}}>Absent Today ({absentIds.length})</label>
+        <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+          {absentIds.map(id=>{const t=data.teachers.find(x=>x.id===id);return t?(<button key={id} onClick={()=>toggleAbsent(id)} className="btn btn-sm" style={{background:'var(--danger)',color:'white',borderColor:'var(--danger)'}}>{t.code} – {t.name} ×</button>):null;})}
+        </div>
+      </div>)}
+    </div>
+
+    {absentSchedules.length===0?(<div className="card"><div className="empty-state"><h3 className="serif">Select absent teachers above</h3><p>Their schedule for {data.school.days[dayIdx]} will appear here with proxy assignment dropdowns.</p></div></div>):(
+      absentSchedules.map(({teacher:at,schedule})=>(
+        <div className="card" key={at.id}>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16}}>
+            <div className="avatar" style={{background:'var(--danger-soft)',color:'var(--danger)'}}>{at.photo?<img src={at.photo} alt=""/>:at.code.slice(0,2)}</div>
+            <div><div style={{fontWeight:600,fontSize:15}}>{at.name} <span className="mono" style={{color:'var(--ink-muted)',fontSize:12}}>{at.code}</span></div><div style={{fontSize:12,color:'var(--danger)'}}>Absent — {data.school.days[dayIdx]}</div></div>
+          </div>
+          {schedule.length===0?<div style={{color:'var(--ink-muted)',fontStyle:'italic',padding:'12px 0'}}>No classes scheduled for this day.</div>:(
+            <table><thead><tr><th>Period</th><th>Time</th><th>Class</th><th>Subject</th><th>Assign Proxy</th></tr></thead><tbody>
+              {schedule.map((sl,i)=>{
+                const subj=data.subjects.find(s=>s.id===sl.subjectId);
+                const slotKey=`${at.id}|${sl.start}|${sl.end}|${sl.classId}|${sl.subjectId}`;
+                const freeTeachers=findFreeTeachers(dayIdx,sl.start,sl.end,data.timetable,data.classes,data.school,data.teachers,absentIds);
+                const freeOpts=[{value:'',label:'-- Select Proxy --'},...freeTeachers.map(t=>({value:t.id,label:t.code+' – '+t.name}))];
+                const assigned=assignments[slotKey];
+                return(<tr key={i}><td style={{fontWeight:600}}>{sl.name}</td><td className="mono">{sl.start}–{sl.end}</td><td>{sl.className}</td><td>{subj?<span className="chip" style={{background:subj.color+'22',color:subj.color}}><span className="chip-color" style={{background:subj.color}}></span>{subj.code}</span>:'--'}</td>
+                  <td><SearchSelect value={assigned||''} options={freeOpts} onChange={v=>assignProxy(slotKey,v)} placeholder="Select proxy..."/></td></tr>);
+              })}
+            </tbody></table>
+          )}
+        </div>
+      ))
+    )}
+
+    {Object.keys(assignments).filter(k=>assignments[k]).length>0&&(
+      <div className="card"><div className="card-title">Proxy Summary</div>
+        <table><thead><tr><th>Proxy Teacher</th><th>Period</th><th>Class</th><th>For (Absent)</th></tr></thead><tbody>
+          {Object.entries(assignments).filter(([k,v])=>v).map(([key,proxyId])=>{
+            const parts=key.split('|');const absent=data.teachers.find(t=>t.id===parts[0]);const proxy=data.teachers.find(t=>t.id===proxyId);
+            const cls=data.classes.find(c=>c.id===parts[3]);
+            return<tr key={key}><td style={{fontWeight:600}}>{proxy?proxy.name:'?'}</td><td className="mono">{parts[1]}–{parts[2]}</td><td>{cls?cls.name:'?'}</td><td>{absent?absent.name:'?'}</td></tr>;
+          })}
+        </tbody></table>
+      </div>
+    )}
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
+
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#0d4f3c">
 <title>The World School — Timetable Studio</title>
