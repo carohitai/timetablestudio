@@ -67,7 +67,7 @@ The client-side guard also checks that `user.email` ends with the domain in the 
 1. Supabase dashboard → **Authentication → Providers → Azure (Microsoft)** → Enable.
 2. **Client ID** = Application (client) ID from step 4.
 3. **Client Secret** = the Value from step 5.
-4. **Azure Tenant URL** = `https://login.microsoftonline.com/<DIRECTORY_TENANT_ID>/v2.0` (the Directory (tenant) ID from step 4; using `common` here would let anyone with any Microsoft account in — we want single-tenant lock).
+4. **Azure Tenant URL** = `https://login.microsoftonline.com/<DIRECTORY_TENANT_ID>` — paste the Directory (tenant) ID from step 4. **Do not append `/v2.0`** — Supabase appends `/oauth2/v2.0/authorize` itself, and adding `/v2.0` on your end produces a 404 at `/v2.0/oauth2/v2.0/authorize`. Using `common` here would let any Microsoft account in — single-tenant lock requires the tenant ID.
 5. **Authentication → URL Configuration** → **Site URL** = the live site URL (e.g. `https://carohitai.github.io/timetablestudio/`). Add the same URL to **Redirect URLs**.
 6. **Authentication → Providers → Email** → **disable** (prevents anyone bypassing SSO via the email/password API directly).
 
