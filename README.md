@@ -46,11 +46,12 @@ If the solver cannot satisfy all constraints, it leaves the grid untouched and e
 - **☁ Cloud Sync** (sidebar panel) uses a shared **Supabase** row so multiple devices can Push/Pull the same workspace with a passcode.
 - The auto-migration pipeline upgrades data from any prior version.
 
-### Cloud Sync — Supabase table setup (one-time)
+### Cloud Sync — Supabase setup (one-time)
 
-The app is wired to the Supabase project at `https://vxjamffecdskypqvwrfq.supabase.co`. Create the sync table and an open RLS policy once, by running this SQL in Supabase → **SQL Editor**:
+The app is wired to the Supabase project at `https://vxjamffecdskypqvwrfq.supabase.co`. Run the SQL below in Supabase → **SQL Editor**. It creates the sync table, the backups history table, and anon-read/write policies.
 
 ```sql
+-- Main workspace row (one per install)
 create table if not exists public.tws_timetables (
   id text primary key,
   data jsonb not null,
@@ -60,19 +61,42 @@ create table if not exists public.tws_timetables (
 );
 
 alter table public.tws_timetables enable row level security;
+create policy "anon read"   on public.tws_timetables for select using (true);
+create policy "anon write"  on public.tws_timetables for insert with check (true);
+create policy "anon update" on public.tws_timetables for update using (true) with check (true);
 
--- Allow the public anon key to read and upsert the shared row.
--- The app gates access via SHA-256 passcode hash stored alongside the row,
--- so only clients with the matching passcode see meaningful data flow.
-create policy "anon read" on public.tws_timetables
-  for select using (true);
-create policy "anon write" on public.tws_timetables
-  for insert with check (true);
-create policy "anon update" on public.tws_timetables
-  for update using (true) with check (true);
+-- Realtime broadcast for the main row (enables the "someone pushed — Pull"
+-- banner in the Cloud Sync panel).
+alter publication supabase_realtime add table public.tws_timetables;
+
+-- Daily backups history. Auto-populated on Push (rate-limited to ~12 hours
+-- between snapshots) so you always have a recent restore point.
+create table if not exists public.tws_backups (
+  id bigserial primary key,
+  workspace_id text not null,
+  data jsonb not null,
+  created_at timestamptz not null default now(),
+  created_by text
+);
+create index if not exists tws_backups_ws_created_idx
+  on public.tws_backups (workspace_id, created_at desc);
+
+alter table public.tws_backups enable row level security;
+create policy "anon read backups"  on public.tws_backups for select using (true);
+create policy "anon write backups" on public.tws_backups for insert with check (true);
 ```
 
-Client-side the passcode is hashed with SHA-256 before going over the wire; Pull refuses to apply a row whose `passcode_hash` doesn't match your local hash. This is a shared-secret scheme — anyone with the Supabase URL + anon key can read the raw row, so **avoid storing sensitive student data in it**. Upgrade to Supabase Auth + row-level security if you need per-user access control.
+### How the three cloud features work
+
+- **Sign in (optional).** The Cloud Sync panel now has email + password fields. Signing in tags every Push with your email in `updated_by` so you get an audit trail. Works without sign-in too — then pushes show as `anonymous`.
+- **Real-time.** The panel subscribes to the shared row via Supabase Realtime. When someone else pushes, you get an amber "↻ X pushed Ys ago — Pull to apply" banner with a one-click Pull button. Your own pushes are suppressed so you don't nag yourself.
+- **Auto-backup.** Every successful Push also inserts a snapshot into `tws_backups`, capped at one per ~12 hours to keep the table small. Click the `⋯` button next to Push/Pull to open the **Cloud Backups** modal — pick any past snapshot and Restore overwrites your local copy (Push again if you want cloud restored too).
+
+### Security notes
+
+- The passcode is hashed (SHA-256) client-side; the raw passcode never leaves the browser. Pull refuses to apply a row whose `passcode_hash` doesn't match yours.
+- The anon key + open RLS is a **shared-secret** model. Anyone with the Supabase URL + anon key can query the raw row. This is fine for internal school schedule data; **do not put student PII** in the timetable payload.
+- For proper per-user access control (different permissions per teacher role), switch the RLS policies from `using (true)` to `using (auth.role() = 'authenticated')` — that requires every client to sign in before they can touch the tables.
 
 ## Deployment
 
