@@ -173,12 +173,14 @@
   .proxy-cell.assigned{border-color:var(--accent);background:rgba(13,79,60,0.04)}
   .proxy-slip{background:white;padding:32px;border:1px solid var(--line);border-radius:10px;margin-top:16px}
 
+  /* Narrow viewport (fold phones, small tablets): let .collapsed do all the
+     shrinking so the toggle actually works. When expanded, the sidebar
+     floats over content as a drawer instead of squeezing the main area. */
+  .sidebar-backdrop{position:fixed;inset:0;background:rgba(26,31,28,0.35);z-index:55;backdrop-filter:blur(2px)}
   @media (max-width:900px){
-    .sidebar{width:64px}
-    .brand,.footer-note,.nav-item span:not(.num){display:none}
-    .nav{padding:20px 8px}
-    .nav-item{justify-content:center}
-    .main{padding:24px;max-width:calc(100vw - 64px)}
+    .sidebar{position:fixed;top:0;left:0;bottom:0;z-index:60;box-shadow:2px 0 24px rgba(0,0,0,0.18)}
+    .sidebar.collapsed{box-shadow:none}
+    .main,.main.sidebar-collapsed{max-width:100vw;padding:24px 24px 80px;padding-left:88px}
     .pagehead h1{font-size:30px}
     .grid-3,.grid-4{grid-template-columns:1fr 1fr}
   }
@@ -891,7 +893,16 @@ function SearchSelect({value,options,onChange,placeholder,style:wrapStyle}){
 // ====== App ======
 function App(){
   const[data,setData]=useState(null);const[tab,setTab]=useState('dashboard');const[loading,setLoading]=useState(true);
-  const[sidebarCollapsed,setSidebarCollapsed]=useState(()=>{try{return localStorage.getItem('tws_sidebar_collapsed')==='1'}catch(e){return false}});
+  const[sidebarCollapsed,setSidebarCollapsed]=useState(()=>{
+    try{
+      const saved=localStorage.getItem('tws_sidebar_collapsed');
+      if(saved!==null)return saved==='1';
+    }catch(e){}
+    // First visit: default collapsed on narrow screens (fold phone outer displays, small tablets).
+    return typeof window!=='undefined'&&window.innerWidth<900;
+  });
+  const isNarrow=typeof window!=='undefined'&&window.innerWidth<900;
+  const onNavTap=tabId=>{setTab(tabId);if(isNarrow)setSidebarCollapsed(true);};
   const[searchOpen,setSearchOpen]=useState(false);
   const[undoHint,setUndoHint]=useState(null);
   // Microsoft SSO auth gate — the app is hidden until the user signs in.
@@ -979,6 +990,7 @@ function App(){
   const canUndo=pastRef.current.length>0;const canRedo=futureRef.current.length>0;
   return(
     <div className="app">
+      {!sidebarCollapsed&&isNarrow&&<div className="sidebar-backdrop" onClick={()=>setSidebarCollapsed(true)}></div>}
       <aside className={`sidebar ${sidebarCollapsed?'collapsed':''}`}>
         <div style={{display:'flex',justifyContent:'flex-end',gap:6,padding:'0 14px',marginBottom:10}}>
           <button className="sidebar-toggle" style={{margin:0}} onClick={async()=>{try{await getSupabase().auth.signOut();}catch(e){}}} title={'Sign out '+(authUser.email||'')}>⎋</button>
@@ -988,7 +1000,7 @@ function App(){
         {!sidebarCollapsed&&<div style={{padding:'0 14px 8px'}}>
           <button onClick={()=>setSearchOpen(true)} className="btn btn-ghost btn-sm" style={{width:'100%',justifyContent:'space-between',fontSize:12}}><span>🔍 Search</span><span className="mono" style={{fontSize:10,color:'var(--ink-muted)'}}>⌘K</span></button>
         </div>}
-        <nav className="nav">{tabs.map(t=>(<button key={t.id} className={`nav-item ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)} title={sidebarCollapsed?t.name:undefined}><span className="num">{t.num}</span><span>{t.name}</span></button>))}</nav>
+        <nav className="nav">{tabs.map(t=>(<button key={t.id} className={`nav-item ${tab===t.id?'active':''}`} onClick={()=>onNavTap(t.id)} title={sidebarCollapsed?t.name:undefined}><span className="num">{t.num}</span><span>{t.name}</span></button>))}</nav>
         <div className="footer-note" style={{padding:'12px 14px'}}>
           {!sidebarCollapsed&&<CloudSyncPanel data={data} setData={setData} authUser={authUser} onToast={msg=>setUndoHint({label:msg,kind:'info'})}/>}
           <div style={{display:'flex',gap:6,marginBottom:6}}>
