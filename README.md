@@ -40,10 +40,39 @@ If the solver cannot satisfy all constraints, it leaves the grid untouched and e
 
 ## Storage & data flow
 
-- All data lives in the browser's `localStorage` under the key `tws_timetable_v7`.
+- All data lives in the browser's `localStorage` under the key `tws_timetable_v8`.
 - **Save as File** (sidebar) downloads a standalone `.html` file with the data embedded — share it, email it, open it on another machine, no setup needed.
 - **Export JSON** / **Import JSON** for plain-data interchange.
-- The auto-migration pipeline upgrades data from any prior version (v1 → v7).
+- **☁ Cloud Sync** (sidebar panel) uses a shared **Supabase** row so multiple devices can Push/Pull the same workspace with a passcode.
+- The auto-migration pipeline upgrades data from any prior version.
+
+### Cloud Sync — Supabase table setup (one-time)
+
+The app is wired to the Supabase project at `https://vxjamffecdskypqvwrfq.supabase.co`. Create the sync table and an open RLS policy once, by running this SQL in Supabase → **SQL Editor**:
+
+```sql
+create table if not exists public.tws_timetables (
+  id text primary key,
+  data jsonb not null,
+  passcode_hash text not null,
+  updated_at timestamptz not null default now(),
+  updated_by text
+);
+
+alter table public.tws_timetables enable row level security;
+
+-- Allow the public anon key to read and upsert the shared row.
+-- The app gates access via SHA-256 passcode hash stored alongside the row,
+-- so only clients with the matching passcode see meaningful data flow.
+create policy "anon read" on public.tws_timetables
+  for select using (true);
+create policy "anon write" on public.tws_timetables
+  for insert with check (true);
+create policy "anon update" on public.tws_timetables
+  for update using (true) with check (true);
+```
+
+Client-side the passcode is hashed with SHA-256 before going over the wire; Pull refuses to apply a row whose `passcode_hash` doesn't match your local hash. This is a shared-secret scheme — anyone with the Supabase URL + anon key can read the raw row, so **avoid storing sensitive student data in it**. Upgrade to Supabase Auth + row-level security if you need per-user access control.
 
 ## Deployment
 
