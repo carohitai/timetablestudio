@@ -46,9 +46,38 @@ If the solver cannot satisfy all constraints, it leaves the grid untouched and e
 - **☁ Cloud Sync** (sidebar panel) uses a shared **Supabase** row so multiple devices can Push/Pull the same workspace with a passcode.
 - The auto-migration pipeline upgrades data from any prior version.
 
-### Cloud Sync — Supabase setup (one-time)
+## Sign-in — Microsoft 365 single tenant
 
-The app is wired to the Supabase project at `https://vxjamffecdskypqvwrfq.supabase.co`. Run the SQL below in Supabase → **SQL Editor**. It creates the sync table, the backups history table, and anon-read/write policies.
+Access is gated by a full-screen **Sign in with Microsoft** page. Only members of The World School ICSE's Microsoft 365 / Entra ID tenant can get in. Email and password sign-up is disabled.
+
+The client-side guard also checks that `user.email` ends with the domain in the `SCHOOL_EMAIL_DOMAIN` constant near the top of `index.html` (default `@theworldschool.in`). If you change school domains, update that one line.
+
+### One-time Azure AD app registration
+
+1. Azure portal → **Microsoft Entra ID** → **App registrations** → **New registration**.
+2. Name: `Timetable Studio`. Account type: **"Accounts in this organizational directory only (single tenant)"**.
+3. Redirect URI: **Web**, value `https://vxjamffecdskypqvwrfq.supabase.co/auth/v1/callback`. Register.
+4. Copy **Application (client) ID** and **Directory (tenant) ID** from the Overview page.
+5. **Certificates & secrets** → **New client secret** → copy the **Value** (shown once).
+6. **Authentication** → tick **ID tokens**.
+7. **API permissions** → Microsoft Graph → Delegated → add `openid`, `email`, `profile`, `User.Read` → click **Grant admin consent**.
+
+### One-time Supabase provider config
+
+1. Supabase dashboard → **Authentication → Providers → Azure (Microsoft)** → Enable.
+2. **Client ID** = Application (client) ID from step 4.
+3. **Client Secret** = the Value from step 5.
+4. **Azure Tenant URL** = `https://login.microsoftonline.com/<DIRECTORY_TENANT_ID>/v2.0` (the Directory (tenant) ID from step 4; using `common` here would let anyone with any Microsoft account in — we want single-tenant lock).
+5. **Authentication → URL Configuration** → **Site URL** = the live site URL (e.g. `https://carohitai.github.io/timetablestudio/`). Add the same URL to **Redirect URLs**.
+6. **Authentication → Providers → Email** → **disable** (prevents anyone bypassing SSO via the email/password API directly).
+
+### How sign-out is enforced
+
+Session lives in Supabase Auth + the browser's localStorage (key `tws_supabase_auth`). The sidebar has a sign-out icon next to the collapse toggle; it calls `supabase.auth.signOut()` which wipes both, and the LoginGate reappears. Closing the tab does not sign out — use the button (or clear site data) to revoke a device.
+
+## Cloud tables
+
+Run the SQL below in Supabase → **SQL Editor**. It creates the sync table, the backups history table, and anon-read/write policies.
 
 ```sql
 -- Main workspace row (one per install)
@@ -86,10 +115,10 @@ create policy "anon read backups"  on public.tws_backups for select using (true)
 create policy "anon write backups" on public.tws_backups for insert with check (true);
 ```
 
-### How the three cloud features work
+### How the cloud features work
 
-- **Sign in (optional).** The Cloud Sync panel now has email + password fields. Signing in tags every Push with your email in `updated_by` so you get an audit trail. Works without sign-in too — then pushes show as `anonymous`.
-- **Real-time.** The panel subscribes to the shared row via Supabase Realtime. When someone else pushes, you get an amber "↻ X pushed Ys ago — Pull to apply" banner with a one-click Pull button. Your own pushes are suppressed so you don't nag yourself.
+- **Identity.** Every Push automatically tags `updated_by` with the signed-in user's school email (from Microsoft SSO). There's no anonymous path anymore — the app itself requires sign-in.
+- **Real-time.** The Cloud Sync panel subscribes to the shared row via Supabase Realtime. When someone else pushes, you get an amber "↻ X pushed Ys ago — Pull to apply" banner with a one-click Pull button. Your own pushes are suppressed so you don't nag yourself.
 - **Auto-backup.** Every successful Push also inserts a snapshot into `tws_backups`, capped at one per ~12 hours to keep the table small. Click the `⋯` button next to Push/Pull to open the **Cloud Backups** modal — pick any past snapshot and Restore overwrites your local copy (Push again if you want cloud restored too).
 
 ### Security notes
