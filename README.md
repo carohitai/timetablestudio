@@ -43,7 +43,7 @@ If the solver cannot satisfy all constraints, it leaves the grid untouched and e
 - All data lives in the browser's `localStorage` under the key `tws_timetable_v8`.
 - **Save as File** (sidebar) downloads a standalone `.html` file with the data embedded — share it, email it, open it on another machine, no setup needed.
 - **Export JSON** / **Import JSON** for plain-data interchange.
-- **☁ Cloud Sync** (sidebar panel) uses a shared **Supabase** row so multiple devices can Push/Pull the same workspace — access is gated by Microsoft SSO, no extra passcode.
+- **☁ Automatic cloud sync** keeps every signed-in device on the same shared **Supabase** row. No buttons — a debounced push fires a couple of seconds after each edit, foreign changes arrive via Supabase Realtime and apply in-place, and a small status chip in the sidebar shows `Synced` / `Syncing…` / `Offline` / `Conflict`.
 - The auto-migration pipeline upgrades data from any prior version.
 
 ## Sign-in — Microsoft 365 single tenant
@@ -94,12 +94,12 @@ create policy "anon read"   on public.tws_timetables for select using (true);
 create policy "anon write"  on public.tws_timetables for insert with check (true);
 create policy "anon update" on public.tws_timetables for update using (true) with check (true);
 
--- Realtime broadcast for the main row (enables the "someone pushed — Pull"
--- banner in the Cloud Sync panel).
+-- Realtime broadcast for the main row (drives the silent auto-apply when
+-- another device saves, and the Conflict state when both sides have edits).
 alter publication supabase_realtime add table public.tws_timetables;
 
--- Daily backups history. Auto-populated on Push (rate-limited to ~12 hours
--- between snapshots) so you always have a recent restore point.
+-- Daily backups history. Auto-populated on every ambient push, rate-limited
+-- to ~12 hours between snapshots, so you always have a recent restore point.
 create table if not exists public.tws_backups (
   id bigserial primary key,
   workspace_id text not null,
@@ -115,11 +115,15 @@ create policy "anon read backups"  on public.tws_backups for select using (true)
 create policy "anon write backups" on public.tws_backups for insert with check (true);
 ```
 
-### How the cloud features work
+### Automatic sync
 
-- **Identity.** Every Push automatically tags `updated_by` with the signed-in user's school email (from Microsoft SSO). There's no anonymous path anymore — the app itself requires sign-in.
-- **Real-time.** The Cloud Sync panel subscribes to the shared row via Supabase Realtime. When someone else pushes, you get an amber "↻ X pushed Ys ago — Pull to apply" banner with a one-click Pull button. Your own pushes are suppressed so you don't nag yourself.
-- **Auto-backup.** Every successful Push also inserts a snapshot into `tws_backups`, capped at one per ~12 hours to keep the table small. Click the `⋯` button next to Push/Pull to open the **Cloud Backups** modal — pick any past snapshot and Restore overwrites your local copy (Push again if you want cloud restored too).
+There is no Push / Pull button anymore — sync is ambient. The sidebar shows a compact chip with the current state; click it to open the **Cloud Backups** modal. Under the hood:
+
+- **Auto-pull on load.** Once Microsoft SSO resolves, the app fetches the cloud row before rendering the main UI. If the local copy is clearly newer (because this device pushed last while another was offline) it's kept as-is; otherwise the cloud copy replaces local and undo history is reset.
+- **Debounced auto-push on every edit.** Each local change resets a 2 s timer; when the timer fires the full snapshot is written to `tws_timetables` and tagged with the signed-in user's school email in `updated_by`. Chains of rapid edits coalesce into a single push.
+- **Realtime apply.** The shared row is subscribed via Supabase Realtime. When someone else pushes and you have no unsynced edits, the change is applied silently and a subtle "Updated by &lt;email&gt;" toast appears. When you *do* have unsynced edits, the chip flips to **Conflict** and offers *Keep mine* / *Use cloud* — no silent overwrites in either direction.
+- **Auto-backup.** Every successful ambient push also inserts a snapshot into `tws_backups`, capped at one per ~12 hours to keep the table small. Clicking the sidebar chip opens the **Cloud Backups** modal — pick any past snapshot and Restore overwrites your local copy; the next debounced auto-push propagates the restored state to the cloud.
+- **Offline tolerance.** If a push fails (no network, Supabase down) the chip shows `Offline — will retry` and the next edit kicks the debounced push again. Your local edits are never lost because `saveData()` always writes localStorage first.
 
 ### Security notes
 

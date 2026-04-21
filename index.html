@@ -909,8 +909,18 @@ function App(){
   const[authUser,setAuthUser]=useState(null);
   const[authReady,setAuthReady]=useState(false);
   const[authError,setAuthError]=useState('');
+  // Ambient cloud sync. Auto-pull on first load, debounced auto-push on edits,
+  // realtime apply for remote changes. syncState drives the sidebar chip.
+  const[syncState,setSyncState]=useState('idle'); // idle | pulling | pushing | synced | offline | conflict
+  const[syncAgo,setSyncAgo]=useState(0);
+  const[backupsOpen,setBackupsOpen]=useState(false);
   const pastRef=useRef([]);
   const futureRef=useRef([]);
+  const lastSyncAtRef=useRef(0); // timestamp of the last successful push/pull
+  const dirtySinceRef=useRef(0); // timestamp of the last local edit
+  const pullingRef=useRef(false); // suppresses auto-push while we're applying a pull
+  const pushTimerRef=useRef(null);
+  const initialPullDoneRef=useRef(false);
   useEffect(()=>{loadData().then(d=>{setData(d);setLoading(false);});},[]);
   useEffect(()=>{if(data&&!loading)saveData(data);},[data,loading]);
   useEffect(()=>{try{localStorage.setItem('tws_sidebar_collapsed',sidebarCollapsed?'1':'0')}catch(e){}},[sidebarCollapsed]);
@@ -960,6 +970,116 @@ function App(){
     document.addEventListener('keydown',h);
     return()=>document.removeEventListener('keydown',h);
   },[searchOpen]);
+
+  // Ambient cloud sync: one-time auto-pull once the user is signed in and
+  // local data is ready. If cloud is empty or local is clearly newer, we
+  // keep local; otherwise we apply the cloud snapshot.
+  useEffect(()=>{
+    if(!authReady||!authUser||!data||loading)return;
+    if(initialPullDoneRef.current)return;
+    initialPullDoneRef.current=true;
+    (async()=>{
+      try{
+        setSyncState('pulling');
+        const cur=await cloudPullRow();
+        if(!cur){setSyncState('synced');lastSyncAtRef.current=Date.now();setSyncAgo(Date.now());return;}
+        const localStamp=(data&&data._updatedAt)||0;
+        if(localStamp>cur.updatedAt+1000){
+          // Local is newer — keep local, let the auto-push below propagate it.
+          setSyncState('synced');lastSyncAtRef.current=cur.updatedAt;setSyncAgo(cur.updatedAt);
+          return;
+        }
+        const migrated=migrateData(JSON.parse(JSON.stringify(cur.data)));
+        pullingRef.current=true;
+        setData(migrated);await saveData(migrated);
+        // Reset history — past states refer to stale local data before the pull.
+        pastRef.current=[];futureRef.current=[];
+        lastSyncAtRef.current=cur.updatedAt;setSyncAgo(cur.updatedAt);
+        setSyncState('synced');
+        // Release the pull guard on next tick so the data-change effect
+        // doesn't mistakenly auto-push what we just pulled.
+        setTimeout(()=>{pullingRef.current=false;},50);
+      }catch(e){setSyncState('offline');}
+    })();
+  },[authReady,authUser,data,loading]);
+
+  // Debounced auto-push on every local edit. Skipped while a pull is being
+  // applied so we don't echo just-pulled data back to the cloud.
+  useEffect(()=>{
+    if(!authUser||!data||loading||!initialPullDoneRef.current)return;
+    if(pullingRef.current)return;
+    dirtySinceRef.current=Date.now();
+    if(pushTimerRef.current)clearTimeout(pushTimerRef.current);
+    pushTimerRef.current=setTimeout(async()=>{
+      pushTimerRef.current=null;
+      try{
+        setSyncState('pushing');
+        const r=await cloudPushRow({data,passcodeHash:'',updatedBy:authUser.email||'unknown'});
+        lastSyncAtRef.current=r.updatedAt;setSyncAgo(r.updatedAt);
+        dirtySinceRef.current=0;
+        setSyncState('synced');
+        cloudInsertBackup({data,updatedBy:authUser.email||'unknown'});
+      }catch(e){setSyncState('offline');}
+    },2000);
+    return()=>{if(pushTimerRef.current){clearTimeout(pushTimerRef.current);pushTimerRef.current=null;}};
+  },[data,authUser,loading]);
+
+  // Realtime apply — when a foreign change arrives and we're clean, pull it
+  // silently and show a small undo-bar-style toast. When we're dirty, flip
+  // into conflict mode so the user can resolve explicitly.
+  useEffect(()=>{
+    if(!authUser||!initialPullDoneRef.current)return;
+    const unsub=cloudSubscribeRow(async newRow=>{
+      if(!newRow)return;
+      const ts=newRow.updated_at?new Date(newRow.updated_at).getTime():0;
+      if(ts<=lastSyncAtRef.current+2000)return; // echo of our own write
+      const localDirty=dirtySinceRef.current>lastSyncAtRef.current;
+      if(localDirty){setSyncState('conflict');return;}
+      try{
+        setSyncState('pulling');
+        const cur=await cloudPullRow();
+        if(!cur)return;
+        const migrated=migrateData(JSON.parse(JSON.stringify(cur.data)));
+        pullingRef.current=true;
+        setData(migrated);await saveData(migrated);
+        pastRef.current=[];futureRef.current=[];
+        lastSyncAtRef.current=cur.updatedAt;setSyncAgo(cur.updatedAt);
+        setSyncState('synced');
+        setUndoHint({label:'Updated by '+(newRow.updated_by||'someone'),kind:'info'});
+        setTimeout(()=>{pullingRef.current=false;},50);
+      }catch(e){setSyncState('offline');}
+    });
+    return unsub;
+  },[authUser]);
+
+  // Manual conflict resolver: user picks "Keep mine" or "Use cloud".
+  const resolveConflict=async(pick)=>{
+    if(pick==='mine'){
+      try{
+        setSyncState('pushing');
+        const r=await cloudPushRow({data,passcodeHash:'',updatedBy:authUser.email||'unknown'});
+        lastSyncAtRef.current=r.updatedAt;setSyncAgo(r.updatedAt);
+        dirtySinceRef.current=0;
+        setSyncState('synced');
+      }catch(e){setSyncState('offline');}
+    }else if(pick==='cloud'){
+      try{
+        setSyncState('pulling');
+        const cur=await cloudPullRow();
+        if(cur){
+          const migrated=migrateData(JSON.parse(JSON.stringify(cur.data)));
+          pullingRef.current=true;
+          setData(migrated);await saveData(migrated);
+          pastRef.current=[];futureRef.current=[];
+          lastSyncAtRef.current=cur.updatedAt;setSyncAgo(cur.updatedAt);
+          dirtySinceRef.current=0;
+        }
+        setSyncState('synced');
+        setTimeout(()=>{pullingRef.current=false;},50);
+      }catch(e){setSyncState('offline');}
+    }
+  };
+
   // Expose undo helpers
   const doUndo=()=>{
     if(!pastRef.current.length)return;
@@ -1002,7 +1122,7 @@ function App(){
         </div>}
         <nav className="nav">{tabs.map(t=>(<button key={t.id} className={`nav-item ${tab===t.id?'active':''}`} onClick={()=>onNavTap(t.id)} title={sidebarCollapsed?t.name:undefined}><span className="num">{t.num}</span><span>{t.name}</span></button>))}</nav>
         <div className="footer-note" style={{padding:'12px 14px'}}>
-          {!sidebarCollapsed&&<CloudSyncPanel data={data} setData={setData} authUser={authUser} onToast={msg=>setUndoHint({label:msg,kind:'info'})}/>}
+          {!sidebarCollapsed&&<SyncStatusChip state={syncState} syncAgo={syncAgo} onBackups={()=>setBackupsOpen(true)} onResolve={resolveConflict}/>}
           <div style={{display:'flex',gap:6,marginBottom:6}}>
             <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11,opacity:canUndo?1:0.4}} disabled={!canUndo} onClick={doUndo} title="Undo (⌘Z)">↶ Undo</button>
             <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11,opacity:canRedo?1:0.4}} disabled={!canRedo} onClick={doRedo} title="Redo (⌘⇧Z)">↷ Redo</button>
@@ -1029,13 +1149,11 @@ function App(){
       </main>
       {searchOpen&&<GlobalSearch data={data} onClose={()=>setSearchOpen(false)} onJump={jumpTo}/>}
       {undoHint&&<UndoBar hint={undoHint} canUndo={canUndo} onUndo={doUndo} onDismiss={()=>setUndoHint(null)}/>}
+      {backupsOpen&&<BackupsModal onClose={()=>setBackupsOpen(false)} onRestore={(rd)=>{const migrated=migrateData(JSON.parse(JSON.stringify(rd)));setData(migrated);saveData(migrated);setBackupsOpen(false);setUndoHint({label:'Restored from backup',kind:'info'});}}/>}
     </div>
   );
 }
 
-// Cloud Sync panel — sidebar footer card that Pushes / Pulls the full data
-// snapshot to a shared Supabase row. Passcode is hashed (SHA-256) and the
-// hash must match between local + cloud before a Pull overwrites.
 // Full-viewport splash while we resolve the initial auth session — avoids
 // a "login page flash" for users who reload and already have a session.
 function SplashLoader({label}){
@@ -1087,92 +1205,41 @@ function LoginGate({error,onSignOutNonTenant}){
   );
 }
 
-function CloudSyncPanel({data,setData,onToast,authUser}){
-  const[open,setOpen]=useState(true);
-  const[busy,setBusy]=useState(false);
-  const[status,setStatus]=useState('');
-  const[lastSeen,setLastSeen]=useState(()=>{try{return Number(localStorage.getItem('tws_cloud_lastSeen'))||0}catch(e){return 0}});
-  const[remoteNotice,setRemoteNotice]=useState(null); // {updatedAt, updatedBy}
-  const[backupsOpen,setBackupsOpen]=useState(false);
-  const stampSeen=ts=>{setLastSeen(ts);try{localStorage.setItem('tws_cloud_lastSeen',String(ts||0))}catch(e){}};
-  const fmtAgo=ts=>{if(!ts)return'never';const s=Math.max(1,Math.floor((Date.now()-ts)/1000));if(s<60)return s+'s ago';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';};
-  const cloudAvailable=typeof window!=='undefined'&&window.supabase;
-  useEffect(()=>{
-    if(!cloudAvailable||!open)return;
-    const unsub=cloudSubscribeRow(newRow=>{
-      if(!newRow)return;
-      const ts=newRow.updated_at?new Date(newRow.updated_at).getTime():0;
-      const by=newRow.updated_by||'someone';
-      if(ts<=lastSeen+2000)return;
-      setRemoteNotice({updatedAt:ts,updatedBy:by});
-    });
-    return unsub;
-  },[cloudAvailable,open,lastSeen]);
-  // Every user reaching this code is SSO-authenticated — identity is the
-  // school email from Microsoft. No separate passcode layer required.
-  const effectiveWho=()=>(authUser&&authUser.email)||'unknown';
-  const doPush=async()=>{
-    if(!cloudAvailable){setStatus('Supabase client not loaded yet.');return;}
-    setBusy(true);setStatus('Checking cloud…');
-    try{
-      const cur=await cloudPullRow();
-      if(cur&&cur.updatedAt>lastSeen+1000){
-        if(!confirm('Cloud was updated '+fmtAgo(cur.updatedAt)+' by '+(cur.updatedBy||'someone')+' (newer than your last sync). Push will overwrite it. Continue?')){setBusy(false);setStatus('Push cancelled.');return;}
-      }
-      setStatus('Pushing…');
-      const r=await cloudPushRow({data,passcodeHash:'',updatedBy:effectiveWho()});
-      stampSeen(r.updatedAt);
-      setStatus('Pushed '+fmtAgo(r.updatedAt));
-      cloudInsertBackup({data,updatedBy:effectiveWho()}).then(res=>{
-        if(res&&res.ok)setStatus(s=>s+' · backup saved');
-      });
-      if(onToast)onToast('Pushed to cloud');
-    }catch(e){setStatus('Error: '+(e.message||e));}
-    finally{setBusy(false);}
+// Compact status chip: ambient sync runs at the App level; this is the only
+// visible surface. Clicking it opens the Backups modal. In Conflict mode
+// it expands to show "Keep mine / Use cloud" buttons.
+function SyncStatusChip({state,syncAgo,onBackups,onResolve}){
+  const fmtAgo=ts=>{if(!ts)return'';const s=Math.max(1,Math.floor((Date.now()-ts)/1000));if(s<60)return s+'s ago';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';};
+  const [tick,setTick]=useState(0);
+  useEffect(()=>{const id=setInterval(()=>setTick(t=>t+1),30000);return()=>clearInterval(id);},[]);
+  const map={
+    idle:{icon:'☁',label:'Cloud idle',color:'var(--ink-muted)'},
+    pulling:{icon:'⇣',label:'Syncing…',color:'var(--accent)'},
+    pushing:{icon:'⇡',label:'Syncing…',color:'var(--accent)'},
+    synced:{icon:'☁',label:syncAgo?'Synced '+fmtAgo(syncAgo):'Synced',color:'var(--accent)'},
+    offline:{icon:'⚠',label:'Offline — will retry',color:'var(--warm)'},
+    conflict:{icon:'⚠',label:'Conflict — resolve',color:'var(--danger)'}
   };
-  const doPull=async()=>{
-    if(!cloudAvailable){setStatus('Supabase client not loaded yet.');return;}
-    setBusy(true);setStatus('Pulling…');
-    try{
-      const cur=await cloudPullRow();
-      if(!cur){setStatus('Cloud is empty — push first to seed.');setBusy(false);return;}
-      const localStamp=data._updatedAt||0;
-      if(localStamp>cur.updatedAt+1000){
-        if(!confirm('Your local copy is newer than cloud. Pull anyway? This overwrites local.')){setBusy(false);setStatus('Pull cancelled.');return;}
-      }
-      const migrated=migrateData(JSON.parse(JSON.stringify(cur.data)));
-      setData(migrated);await saveData(migrated);
-      stampSeen(cur.updatedAt);
-      setRemoteNotice(null);
-      setStatus('Pulled '+fmtAgo(cur.updatedAt));
-      if(onToast)onToast('Pulled from cloud');
-    }catch(e){setStatus('Error: '+(e.message||e));}
-    finally{setBusy(false);}
-  };
-  const statusColor=status.startsWith('Error')?'var(--danger)':status?'var(--accent)':'var(--ink-muted)';
-  return(<>
-    <div style={{marginBottom:10,padding:10,border:'1px solid var(--line)',borderRadius:6,background:'var(--bg)'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:open?8:0,cursor:'pointer'}} onClick={()=>setOpen(o=>!o)}>
-        <span style={{fontSize:10.5,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:600}}>☁ Cloud Sync</span>
-        <span style={{fontSize:10,color:remoteNotice?'var(--warm)':'var(--ink-muted)'}}>{remoteNotice?'new':(lastSeen?fmtAgo(lastSeen):'ready')}</span>
-      </div>
-      {open&&<>
-        <div style={{display:'flex',gap:6,marginBottom:6}}>
-          <button className="btn btn-primary btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} disabled={busy||!cloudAvailable} onClick={doPush}>Push</button>
-          <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} disabled={busy||!cloudAvailable} onClick={doPull}>Pull</button>
-          <button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:'4px 8px'}} disabled={!cloudAvailable} onClick={()=>setBackupsOpen(true)} title="Browse daily backups">⋯</button>
+  const s=map[state]||map.idle;
+  if(state==='conflict'){
+    return(
+      <div style={{marginBottom:10,padding:10,border:'1px solid var(--danger)',borderRadius:6,background:'var(--danger-soft)'}}>
+        <div style={{fontSize:10.5,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--danger)',fontWeight:600,marginBottom:6}}>⚠ Sync conflict</div>
+        <div style={{fontSize:11,color:'var(--ink-soft)',marginBottom:8,lineHeight:1.4}}>Someone else pushed while you had unsynced local changes. Pick one:</div>
+        <div style={{display:'flex',gap:6}}>
+          <button className="btn btn-primary btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={()=>onResolve('mine')}>Keep mine</button>
+          <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={()=>onResolve('cloud')}>Use cloud</button>
         </div>
-        {remoteNotice&&(
-          <div style={{fontSize:10.5,color:'var(--warm)',background:'#fef3c7',padding:'6px 8px',borderRadius:4,marginBottom:6,display:'flex',alignItems:'center',gap:6}}>
-            <span style={{flex:1}}>↻ {remoteNotice.updatedBy} pushed {fmtAgo(remoteNotice.updatedAt)} — Pull to apply.</span>
-            <button onClick={doPull} className="btn btn-ghost btn-sm" style={{fontSize:10,padding:'2px 6px'}} disabled={busy}>Pull</button>
-          </div>
-        )}
-        <div style={{fontSize:10,color:statusColor,minHeight:14,lineHeight:1.3}}>{status||(cloudAvailable?('Signed in as '+((authUser&&authUser.email)||'unknown')):'Supabase offline.')}</div>
-      </>}
-    </div>
-    {backupsOpen&&<BackupsModal onClose={()=>setBackupsOpen(false)} onRestore={(rd)=>{const migrated=migrateData(JSON.parse(JSON.stringify(rd)));setData(migrated);saveData(migrated);setBackupsOpen(false);if(onToast)onToast('Restored from backup');}}/>}
-  </>);
+      </div>
+    );
+  }
+  return(
+    <button onClick={onBackups} title="Click to browse cloud backups" style={{display:'flex',alignItems:'center',gap:8,width:'100%',padding:'7px 10px',marginBottom:10,border:'1px solid var(--line)',borderRadius:6,background:'var(--bg)',color:s.color,cursor:'pointer',fontSize:11,fontWeight:500}}>
+      <span style={{fontSize:13}}>{s.icon}</span>
+      <span style={{flex:1,textAlign:'left'}}>{s.label}</span>
+      <span style={{fontSize:10,color:'var(--ink-muted)'}}>⋯</span>
+    </button>
+  );
 }
 
 // Modal listing the 20 most recent auto-backups (from tws_backups).
@@ -1184,7 +1251,7 @@ function BackupsModal({onClose,onRestore}){
   useEffect(()=>{cloudListBackups(20).then(r=>{setRows(r);setLoading(false);}).catch(e=>{setErr(String(e.message||e));setLoading(false);});},[]);
   const fmtWhen=ts=>{try{return new Date(ts).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'});}catch(e){return ts;}};
   const doRestore=async(r)=>{
-    if(!confirm('Restore this backup from '+fmtWhen(r.created_at)+'?\n\nThis overwrites your local data (but does not push to cloud until you hit Push).'))return;
+    if(!confirm('Restore this backup from '+fmtWhen(r.created_at)+'?\n\nThis overwrites your local data; the ambient sync will propagate it to cloud within a few seconds.'))return;
     setRestoring(r.id);
     try{
       const full=await cloudFetchBackup(r.id);
@@ -1195,9 +1262,9 @@ function BackupsModal({onClose,onRestore}){
   return(
     <div className="modal-bg" onClick={onClose}>
       <div className="modal" role="dialog" aria-modal="true" aria-label="Cloud backups" onClick={e=>e.stopPropagation()} style={{maxWidth:520}}>
-        <div className="modal-head"><h3 className="serif">Cloud <em>Backups</em></h3><div style={{fontSize:12,color:'var(--ink-muted)'}}>Auto-saved every ~12 hours when Push is used. Most recent first.</div></div>
+        <div className="modal-head"><h3 className="serif">Cloud <em>Backups</em></h3><div style={{fontSize:12,color:'var(--ink-muted)'}}>Auto-saved every ~12 hours while you edit. Most recent first.</div></div>
         <div className="modal-body">
-          {loading?<div style={{color:'var(--ink-muted)',padding:10}}>Loading…</div>:err?<div style={{color:'var(--danger)',padding:10,fontSize:13}}>{err}</div>:!rows.length?<div style={{color:'var(--ink-muted)',padding:10,fontStyle:'italic'}}>No backups yet. Push once to start the history.</div>:
+          {loading?<div style={{color:'var(--ink-muted)',padding:10}}>Loading…</div>:err?<div style={{color:'var(--danger)',padding:10,fontSize:13}}>{err}</div>:!rows.length?<div style={{color:'var(--ink-muted)',padding:10,fontStyle:'italic'}}>No backups yet. Make an edit and the first snapshot will appear here.</div>:
           <table style={{width:'100%',fontSize:12.5}}><thead><tr><th>When</th><th>By</th><th style={{textAlign:'right'}}></th></tr></thead><tbody>
             {rows.map(r=>(<tr key={r.id}><td>{fmtWhen(r.created_at)}</td><td style={{color:'var(--ink-muted)'}}>{r.created_by||'—'}</td><td style={{textAlign:'right'}}><button className="btn btn-ghost btn-sm" disabled={restoring===r.id} onClick={()=>doRestore(r)}>{restoring===r.id?'…':'Restore'}</button></td></tr>))}
           </tbody></table>}
