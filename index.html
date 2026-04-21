@@ -1088,53 +1088,41 @@ function LoginGate({error,onSignOutNonTenant}){
 }
 
 function CloudSyncPanel({data,setData,onToast,authUser}){
-  const[pass,setPass]=useState(()=>{try{return localStorage.getItem('tws_cloud_passcode')||''}catch(e){return''}});
-  const[open,setOpen]=useState(()=>!!(()=>{try{return localStorage.getItem('tws_cloud_passcode')}catch(e){return''}})());
+  const[open,setOpen]=useState(true);
   const[busy,setBusy]=useState(false);
   const[status,setStatus]=useState('');
   const[lastSeen,setLastSeen]=useState(()=>{try{return Number(localStorage.getItem('tws_cloud_lastSeen'))||0}catch(e){return 0}});
-  // Realtime notice
   const[remoteNotice,setRemoteNotice]=useState(null); // {updatedAt, updatedBy}
-  // Backups modal
   const[backupsOpen,setBackupsOpen]=useState(false);
-  const savePass=v=>{setPass(v);try{localStorage.setItem('tws_cloud_passcode',v||'')}catch(e){}};
   const stampSeen=ts=>{setLastSeen(ts);try{localStorage.setItem('tws_cloud_lastSeen',String(ts||0))}catch(e){}};
   const fmtAgo=ts=>{if(!ts)return'never';const s=Math.max(1,Math.floor((Date.now()-ts)/1000));if(s<60)return s+'s ago';const m=Math.floor(s/60);if(m<60)return m+'m ago';const h=Math.floor(m/60);if(h<24)return h+'h ago';return Math.floor(h/24)+'d ago';};
   const cloudAvailable=typeof window!=='undefined'&&window.supabase;
-  // Subscribe to remote row changes
   useEffect(()=>{
     if(!cloudAvailable||!open)return;
     const unsub=cloudSubscribeRow(newRow=>{
       if(!newRow)return;
       const ts=newRow.updated_at?new Date(newRow.updated_at).getTime():0;
       const by=newRow.updated_by||'someone';
-      // Ignore my own writes — they match lastSeen within 2s.
       if(ts<=lastSeen+2000)return;
       setRemoteNotice({updatedAt:ts,updatedBy:by});
     });
     return unsub;
   },[cloudAvailable,open,lastSeen]);
-  // updated_by is always the signed-in SSO identity — there's no anonymous path anymore.
+  // Every user reaching this code is SSO-authenticated — identity is the
+  // school email from Microsoft. No separate passcode layer required.
   const effectiveWho=()=>(authUser&&authUser.email)||'unknown';
   const doPush=async()=>{
-    if(!pass){setStatus('Enter a passcode first.');return;}
     if(!cloudAvailable){setStatus('Supabase client not loaded yet.');return;}
-    setBusy(true);setStatus('Hashing…');
+    setBusy(true);setStatus('Checking cloud…');
     try{
-      const localHash=await sha256Hex(pass);
-      setStatus('Checking cloud…');
       const cur=await cloudPullRow();
-      if(cur&&cur.passcodeHash&&cur.passcodeHash!==localHash){
-        if(!confirm('The cloud row is protected by a different passcode.\n\nPush anyway? This resets the cloud passcode to yours and overwrites the stored data.')){setBusy(false);setStatus('Push cancelled.');return;}
-      }
       if(cur&&cur.updatedAt>lastSeen+1000){
         if(!confirm('Cloud was updated '+fmtAgo(cur.updatedAt)+' by '+(cur.updatedBy||'someone')+' (newer than your last sync). Push will overwrite it. Continue?')){setBusy(false);setStatus('Push cancelled.');return;}
       }
       setStatus('Pushing…');
-      const r=await cloudPushRow({data,passcodeHash:localHash,updatedBy:effectiveWho()});
+      const r=await cloudPushRow({data,passcodeHash:'',updatedBy:effectiveWho()});
       stampSeen(r.updatedAt);
       setStatus('Pushed '+fmtAgo(r.updatedAt));
-      // Fire-and-forget daily backup (rate-limited 12h inside the helper).
       cloudInsertBackup({data,updatedBy:effectiveWho()}).then(res=>{
         if(res&&res.ok)setStatus(s=>s+' · backup saved');
       });
@@ -1143,17 +1131,11 @@ function CloudSyncPanel({data,setData,onToast,authUser}){
     finally{setBusy(false);}
   };
   const doPull=async()=>{
-    if(!pass){setStatus('Enter a passcode first.');return;}
     if(!cloudAvailable){setStatus('Supabase client not loaded yet.');return;}
-    setBusy(true);setStatus('Hashing…');
+    setBusy(true);setStatus('Pulling…');
     try{
-      const localHash=await sha256Hex(pass);
-      setStatus('Pulling…');
       const cur=await cloudPullRow();
       if(!cur){setStatus('Cloud is empty — push first to seed.');setBusy(false);return;}
-      if(cur.passcodeHash&&cur.passcodeHash!==localHash){
-        setStatus('Passcode mismatch — cloud row is protected.');setBusy(false);return;
-      }
       const localStamp=data._updatedAt||0;
       if(localStamp>cur.updatedAt+1000){
         if(!confirm('Your local copy is newer than cloud. Pull anyway? This overwrites local.')){setBusy(false);setStatus('Pull cancelled.');return;}
@@ -1167,28 +1149,26 @@ function CloudSyncPanel({data,setData,onToast,authUser}){
     }catch(e){setStatus('Error: '+(e.message||e));}
     finally{setBusy(false);}
   };
-  const statusColor=status.startsWith('Error')||status.startsWith('Passcode')?'var(--danger)':status?'var(--accent)':'var(--ink-muted)';
-  const inpStyle={width:'100%',padding:'6px 8px',border:'1px solid var(--line)',borderRadius:4,fontSize:11.5,marginBottom:6,background:'var(--paper)'};
+  const statusColor=status.startsWith('Error')?'var(--danger)':status?'var(--accent)':'var(--ink-muted)';
   return(<>
     <div style={{marginBottom:10,padding:10,border:'1px solid var(--line)',borderRadius:6,background:'var(--bg)'}}>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:open?8:0,cursor:'pointer'}} onClick={()=>setOpen(o=>!o)}>
         <span style={{fontSize:10.5,letterSpacing:'.12em',textTransform:'uppercase',color:'var(--ink-muted)',fontWeight:600}}>☁ Cloud Sync</span>
-        <span style={{fontSize:10,color:remoteNotice?'var(--warm)':'var(--ink-muted)'}}>{remoteNotice?'new':(lastSeen?fmtAgo(lastSeen):'off')}</span>
+        <span style={{fontSize:10,color:remoteNotice?'var(--warm)':'var(--ink-muted)'}}>{remoteNotice?'new':(lastSeen?fmtAgo(lastSeen):'ready')}</span>
       </div>
       {open&&<>
-        <input type="password" value={pass} onChange={e=>savePass(e.target.value)} placeholder="Workspace passcode" style={inpStyle}/>
         <div style={{display:'flex',gap:6,marginBottom:6}}>
-          <button className="btn btn-primary btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} disabled={busy||!pass||!cloudAvailable} onClick={doPush}>Push</button>
-          <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} disabled={busy||!pass||!cloudAvailable} onClick={doPull}>Pull</button>
+          <button className="btn btn-primary btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} disabled={busy||!cloudAvailable} onClick={doPush}>Push</button>
+          <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} disabled={busy||!cloudAvailable} onClick={doPull}>Pull</button>
           <button className="btn btn-ghost btn-sm" style={{fontSize:11,padding:'4px 8px'}} disabled={!cloudAvailable} onClick={()=>setBackupsOpen(true)} title="Browse daily backups">⋯</button>
         </div>
         {remoteNotice&&(
           <div style={{fontSize:10.5,color:'var(--warm)',background:'#fef3c7',padding:'6px 8px',borderRadius:4,marginBottom:6,display:'flex',alignItems:'center',gap:6}}>
             <span style={{flex:1}}>↻ {remoteNotice.updatedBy} pushed {fmtAgo(remoteNotice.updatedAt)} — Pull to apply.</span>
-            <button onClick={doPull} className="btn btn-ghost btn-sm" style={{fontSize:10,padding:'2px 6px'}} disabled={busy||!pass}>Pull</button>
+            <button onClick={doPull} className="btn btn-ghost btn-sm" style={{fontSize:10,padding:'2px 6px'}} disabled={busy}>Pull</button>
           </div>
         )}
-        <div style={{fontSize:10,color:statusColor,minHeight:14,lineHeight:1.3}}>{status||(cloudAvailable?(pass?'Signed in as '+((authUser&&authUser.email)||'unknown')+'. Ready.':'Enter passcode to enable.'):'Supabase offline.')}</div>
+        <div style={{fontSize:10,color:statusColor,minHeight:14,lineHeight:1.3}}>{status||(cloudAvailable?('Signed in as '+((authUser&&authUser.email)||'unknown')):'Supabase offline.')}</div>
       </>}
     </div>
     {backupsOpen&&<BackupsModal onClose={()=>setBackupsOpen(false)} onRestore={(rd)=>{const migrated=migrateData(JSON.parse(JSON.stringify(rd)));setData(migrated);saveData(migrated);setBackupsOpen(false);if(onToast)onToast('Restored from backup');}}/>}

@@ -43,7 +43,7 @@ If the solver cannot satisfy all constraints, it leaves the grid untouched and e
 - All data lives in the browser's `localStorage` under the key `tws_timetable_v8`.
 - **Save as File** (sidebar) downloads a standalone `.html` file with the data embedded — share it, email it, open it on another machine, no setup needed.
 - **Export JSON** / **Import JSON** for plain-data interchange.
-- **☁ Cloud Sync** (sidebar panel) uses a shared **Supabase** row so multiple devices can Push/Pull the same workspace with a passcode.
+- **☁ Cloud Sync** (sidebar panel) uses a shared **Supabase** row so multiple devices can Push/Pull the same workspace — access is gated by Microsoft SSO, no extra passcode.
 - The auto-migration pipeline upgrades data from any prior version.
 
 ## Sign-in — Microsoft 365 single tenant
@@ -123,7 +123,21 @@ create policy "anon write backups" on public.tws_backups for insert with check (
 
 ### Security notes
 
-- The passcode is hashed (SHA-256) client-side; the raw passcode never leaves the browser. Pull refuses to apply a row whose `passcode_hash` doesn't match yours.
+- Every cloud call is made by a Microsoft-SSO-authenticated user from the school's Azure AD tenant (enforced both at the identity provider and via the `SCHOOL_EMAIL_DOMAIN` client-side guard). Passcode was dropped on 2026-04-21 as redundant — SSO already identifies the caller.
+- **Recommended hardening.** Replace the `using (true)` / `with check (true)` policies above with authenticated-only variants so only signed-in Supabase users can touch the tables:
+  ```sql
+  drop policy if exists "anon read"   on public.tws_timetables;
+  drop policy if exists "anon write"  on public.tws_timetables;
+  drop policy if exists "anon update" on public.tws_timetables;
+  create policy "authed rw" on public.tws_timetables
+    for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+  -- repeat for tws_backups:
+  drop policy if exists "anon read backups"  on public.tws_backups;
+  drop policy if exists "anon write backups" on public.tws_backups;
+  create policy "authed rw backups" on public.tws_backups
+    for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+  ```
+  After this the anon key alone is useless — clients must carry a valid Supabase JWT (which they get automatically when Microsoft SSO completes).
 - The anon key + open RLS is a **shared-secret** model. Anyone with the Supabase URL + anon key can query the raw row. This is fine for internal school schedule data; **do not put student PII** in the timetable payload.
 - For proper per-user access control (different permissions per teacher role), switch the RLS policies from `using (true)` to `using (auth.role() = 'authenticated')` — that requires every client to sign in before they can touch the tables.
 
