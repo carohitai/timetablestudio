@@ -14,7 +14,7 @@
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
-  :root{--bg:#f6f3ec;--paper:#fbf9f3;--ink:#1a1f1c;--ink-soft:#4a544d;--ink-muted:#8a8f88;--line:#e3ddcf;--line-soft:#ebe6da;--accent:#0d4f3c;--accent-soft:#1a6b54;--warm:#b8651f;--warm-soft:#d97a26;--danger:#9a2a2a;--danger-soft:#fde2e2}
+  :root{--bg:#f6f3ec;--paper:#fbf9f3;--ink:#1a1f1c;--ink-soft:#4a544d;--ink-muted:#8a8f88;--line:#e3ddcf;--line-soft:#ebe6da;--accent:#0d4f3c;--accent-soft:#1a6b54;--mint:#9fd5c3;--warm:#b8651f;--warm-soft:#d97a26;--danger:#9a2a2a;--danger-soft:#fde2e2}
   *{box-sizing:border-box;margin:0;padding:0}
   html,body{background:var(--bg);color:var(--ink);font-family:'Geist',-apple-system,sans-serif;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
   body{min-height:100vh}
@@ -829,7 +829,11 @@ function App(){
     const h=e=>{
       const mod=e.ctrlKey||e.metaKey;
       const k=(e.key||'').toLowerCase();
+      // Don't hijack native text-editing shortcuts while the user is typing.
+      const tgt=e.target||{};
+      const inText=tgt.tagName==='INPUT'||tgt.tagName==='TEXTAREA'||tgt.isContentEditable;
       if(mod&&k==='k'){e.preventDefault();setSearchOpen(v=>!v);return;}
+      if(inText&&(k==='z'||k==='y'))return; // let the browser handle text undo/redo
       if(mod&&!e.shiftKey&&k==='z'){e.preventDefault();doUndo();return;}
       if((mod&&e.shiftKey&&k==='z')||(mod&&k==='y')){e.preventDefault();doRedo();return;}
       if(k==='escape'&&searchOpen)setSearchOpen(false);
@@ -908,7 +912,7 @@ function UndoBar({hint,canUndo,onUndo,onDismiss}){
   return(
     <div className="no-print" style={{position:'fixed',left:'50%',bottom:24,transform:'translateX(-50%)',background:'var(--ink)',color:'var(--paper)',padding:'10px 14px',borderRadius:8,display:'flex',alignItems:'center',gap:14,boxShadow:'0 12px 32px rgba(0,0,0,0.22)',zIndex:80,fontSize:13}}>
       <span>{hint.label}</span>
-      {hint.kind==='action'&&canUndo&&<button onClick={onUndo} style={{background:'transparent',color:'#9fd5c3',border:'none',cursor:'pointer',fontWeight:600,fontSize:13,padding:0,textDecoration:'underline'}}>Undo</button>}
+      {hint.kind==='action'&&canUndo&&<button onClick={onUndo} style={{background:'transparent',color:'var(--mint)',border:'none',cursor:'pointer',fontWeight:600,fontSize:13,padding:0,textDecoration:'underline'}}>Undo</button>}
       <button onClick={onDismiss} style={{background:'transparent',color:'var(--paper)',border:'none',cursor:'pointer',opacity:0.6,fontSize:16,padding:0,lineHeight:1}}>×</button>
     </div>
   );
@@ -934,8 +938,8 @@ function GlobalSearch({data,onClose,onJump}){
     </button>
   );
   return(
-    <div className="modal-bg" onClick={onClose} style={{alignItems:'flex-start',paddingTop:80}}>
-      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560,width:'100%',maxHeight:'70vh'}}>
+    <div className="modal-bg" onClick={onClose} style={{alignItems:'flex-start',paddingTop:80}} role="presentation">
+      <div className="modal" role="dialog" aria-modal="true" aria-label="Global search" onClick={e=>e.stopPropagation()} style={{maxWidth:560,width:'100%',maxHeight:'70vh'}}>
         <div style={{padding:'14px 16px',borderBottom:'1px solid var(--line)'}}>
           <input ref={ref} value={q} onChange={e=>setQ(e.target.value)} placeholder="Search teachers, classes, subjects, rooms…" style={{width:'100%',padding:'8px 4px',border:'none',outline:'none',fontSize:15,background:'transparent',color:'var(--ink)'}}/>
           <div style={{fontSize:10.5,color:'var(--ink-muted)',marginTop:4,letterSpacing:'.06em'}}>Type to search · <span className="mono">Esc</span> to close</div>
@@ -1044,7 +1048,9 @@ function Dashboard({data,setTab}){
   // "Needs your attention" — per-teacher load issues, coverage gaps, conflicts.
   const loads=data.teachers.map(t=>({t,total:teacherLoad(t,data.timetable,data.classes,data.school).total,max:t.maxPeriods||42}));
   const overloaded=loads.filter(l=>l.total>l.max);
-  const idle=loads.filter(l=>l.total===0&&l.t.designation!=='Principal');
+  // Skip roles that legitimately have no weekly periods, not just the Principal.
+  const NO_SCHEDULE_DESIGS=/principal|vice\s*principal|librarian|lab\s*asst|counsellor|sport\s*teacher/i;
+  const idle=loads.filter(l=>l.total===0&&!NO_SCHEDULE_DESIGS.test(l.t.designation||''));
   const expectedByClass={};data.classes.forEach(c=>{expectedByClass[c.id]=c.group==='preprimary'?preP:c.group==='upper'?up:pri;});
   const lowCoverage=data.classes.map(c=>({c,filled:classFilled[c.id]||0,expected:expectedByClass[c.id]||0})).filter(x=>x.expected&&x.filled<x.expected*0.5).sort((a,b)=>(a.filled/a.expected)-(b.filled/b.expected)).slice(0,4);
   const unallocatedCells=Object.entries(data.timetable||{}).flatMap(([cId,days])=>Object.entries(days||{}).flatMap(([d,pers])=>Object.entries(pers||{}).filter(([,cell])=>cell&&!cell.teacherId).map(()=>cId))).length;
@@ -1681,8 +1687,8 @@ function AllocatePage({data,update}){
     <div className="card"><div style={{display:'flex',justifyContent:'space-between',alignItems:'center',flexWrap:'wrap',gap:8,marginBottom:14}}>
         <div className="card-title" style={{margin:0}}>Bulk Assign</div>
         <div style={{display:'flex',gap:6}}>
-          <button className="btn btn-danger btn-sm" onClick={()=>{if(!Object.keys(data.allocations||{}).length){alert('No allocations to clear.');return;}if(confirm('Clear ALL teacher-subject allocations?\n\nThe current timetable cells (already-scheduled periods) stay in place — only the class×subject→teacher links are wiped so you can redo them manually.\n\nContinue?'))update({allocations:{}});}}>Clear All Allocations</button>
-          <button className="btn btn-ghost btn-sm" onClick={()=>{if(!Object.keys(data.timetable||{}).length){alert('No scheduled periods.');return;}if(confirm('Clear ALL scheduled periods for every class?\n\nThis wipes the Timetable grids but keeps your allocations. You can then build the timetable manually.\n\nContinue?'))update({timetable:{}});}}>Clear All Timetables</button>
+          <button className="btn btn-danger btn-sm" onClick={()=>{if(!Object.keys(data.allocations||{}).length){alert('No allocations to clear.');return;}if(confirm('Clear ALL teacher-subject allocations?\n\nThe current timetable cells (already-scheduled periods) stay in place — only the class×subject→teacher links are wiped so you can redo them manually.\n\nContinue?'))update({allocations:{}},'Cleared all allocations');}}>Clear All Allocations</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>{if(!Object.keys(data.timetable||{}).length){alert('No scheduled periods.');return;}if(confirm('Clear ALL scheduled periods for every class?\n\nThis wipes the Timetable grids but keeps your allocations. You can then build the timetable manually.\n\nContinue?'))update({timetable:{}},'Cleared all timetables');}}>Clear All Timetables</button>
         </div>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
@@ -2278,6 +2284,9 @@ function ProxyPage({data,update}){
     if(!absentSchedules.length){alert('Mark absent teachers first.');return;}
     const weekLoad={};
     data.teachers.forEach(t=>{weekLoad[t.id]=teacherLoad(t,data.timetable,data.classes,data.school).total;});
+    // Fold already-assigned proxy picks into weekLoad so repeated Suggest
+    // clicks don't ignore teachers we just handed extra periods to.
+    Object.values(assignments).forEach(pid=>{if(pid)weekLoad[pid]=(weekLoad[pid]||0)+1;});
     const next={...assignments};
     absentSchedules.forEach(({teacher:at,schedule})=>{
       schedule.forEach(sl=>{
