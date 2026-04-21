@@ -816,23 +816,71 @@ function SearchSelect({value,options,onChange,placeholder,style:wrapStyle}){
 function App(){
   const[data,setData]=useState(null);const[tab,setTab]=useState('dashboard');const[loading,setLoading]=useState(true);
   const[sidebarCollapsed,setSidebarCollapsed]=useState(()=>{try{return localStorage.getItem('tws_sidebar_collapsed')==='1'}catch(e){return false}});
+  const[searchOpen,setSearchOpen]=useState(false);
+  const[undoHint,setUndoHint]=useState(null);
+  const pastRef=useRef([]);
+  const futureRef=useRef([]);
   useEffect(()=>{loadData().then(d=>{setData(d);setLoading(false);});},[]);
   useEffect(()=>{if(data&&!loading)saveData(data);},[data,loading]);
   useEffect(()=>{try{localStorage.setItem('tws_sidebar_collapsed',sidebarCollapsed?'1':'0')}catch(e){}},[sidebarCollapsed]);
+  useEffect(()=>{if(!undoHint)return;const t=setTimeout(()=>setUndoHint(null),6000);return()=>clearTimeout(t);},[undoHint]);
+  // Keyboard shortcuts
+  useEffect(()=>{
+    const h=e=>{
+      const mod=e.ctrlKey||e.metaKey;
+      const k=(e.key||'').toLowerCase();
+      if(mod&&k==='k'){e.preventDefault();setSearchOpen(v=>!v);return;}
+      if(mod&&!e.shiftKey&&k==='z'){e.preventDefault();doUndo();return;}
+      if((mod&&e.shiftKey&&k==='z')||(mod&&k==='y')){e.preventDefault();doRedo();return;}
+      if(k==='escape'&&searchOpen)setSearchOpen(false);
+    };
+    document.addEventListener('keydown',h);
+    return()=>document.removeEventListener('keydown',h);
+  },[searchOpen]);
+  // Expose undo helpers
+  const doUndo=()=>{
+    if(!pastRef.current.length)return;
+    const prev=pastRef.current.pop();
+    setData(curr=>{futureRef.current.push(curr);return prev;});
+    setUndoHint({label:'Undone',kind:'undo'});
+  };
+  const doRedo=()=>{
+    if(!futureRef.current.length)return;
+    const next=futureRef.current.pop();
+    setData(curr=>{pastRef.current.push(curr);return next;});
+    setUndoHint({label:'Redone',kind:'redo'});
+  };
   if(loading||!data)return<div style={{padding:40,color:'#8a8f88'}}>Loading…</div>;
-  const update=patch=>setData(d=>({...d,...patch}));
+  // Wrapper over setData that records history and shows an undo bar
+  const update=(patch,label)=>{
+    setData(d=>{
+      pastRef.current=[...pastRef.current.slice(-49),d];
+      futureRef.current=[];
+      return{...d,...patch};
+    });
+    if(label)setUndoHint({label,kind:'action',ts:Date.now()});
+  };
   const tabs=[{id:'dashboard',num:'01',name:'Overview'},{id:'school',num:'02',name:'Day Structure'},{id:'classes',num:'03',name:'Classes'},{id:'qualmaster',num:'04',name:'Qual. Master'},{id:'teachers',num:'05',name:'Faculty'},{id:'subjects',num:'06',name:'Subjects'},{id:'allocate',num:'07',name:'Allocations'},{id:'timetable',num:'08',name:'Timetable'},{id:'load',num:'09',name:'Teacher Load'},{id:'proxy',num:'10',name:'Proxy Mgmt'},{id:'rules',num:'11',name:'Rules'}];
+  const jumpTo=(target)=>{setSearchOpen(false);if(target&&target.tab)setTab(target.tab);};
+  const canUndo=pastRef.current.length>0;const canRedo=futureRef.current.length>0;
   return(
     <div className="app">
       <aside className={`sidebar ${sidebarCollapsed?'collapsed':''}`}>
         <button className="sidebar-toggle" onClick={()=>setSidebarCollapsed(v=>!v)} title={sidebarCollapsed?'Expand sidebar':'Collapse sidebar'}>{sidebarCollapsed?'»':'«'}</button>
         <div className="brand"><div className="mark">The World School · ICSE</div><div className="name serif">Timetable <em>Studio</em></div></div>
+        {!sidebarCollapsed&&<div style={{padding:'0 14px 8px'}}>
+          <button onClick={()=>setSearchOpen(true)} className="btn btn-ghost btn-sm" style={{width:'100%',justifyContent:'space-between',fontSize:12}}><span>🔍 Search</span><span className="mono" style={{fontSize:10,color:'var(--ink-muted)'}}>⌘K</span></button>
+        </div>}
         <nav className="nav">{tabs.map(t=>(<button key={t.id} className={`nav-item ${tab===t.id?'active':''}`} onClick={()=>setTab(t.id)} title={sidebarCollapsed?t.name:undefined}><span className="num">{t.num}</span><span>{t.name}</span></button>))}</nav>
         <div className="footer-note" style={{padding:'12px 14px'}}>
+          <div style={{display:'flex',gap:6,marginBottom:6}}>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11,opacity:canUndo?1:0.4}} disabled={!canUndo} onClick={doUndo} title="Undo (⌘Z)">↶ Undo</button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11,opacity:canRedo?1:0.4}} disabled={!canRedo} onClick={doRedo} title="Redo (⌘⇧Z)">↷ Redo</button>
+          </div>
           <button className="btn btn-primary btn-sm" style={{width:'100%',marginBottom:6,justifyContent:'center'}} onClick={()=>saveAsHTMLFile(data)}>Save as File</button>
           <div style={{display:'flex',gap:6}}>
             <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={()=>exportJSON(data)}>Export JSON</button>
-            <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={()=>importJSON(d=>{setData(d);saveData(d);})}>Import JSON</button>
+            <button className="btn btn-ghost btn-sm" style={{flex:1,justifyContent:'center',fontSize:11}} onClick={()=>importJSON(d=>{setData(d);saveData(d);pastRef.current=[];futureRef.current=[];})}>Import JSON</button>
           </div>
         </div>
       </aside>
@@ -849,6 +897,58 @@ function App(){
         {tab==='proxy'&&<ProxyPage data={data} update={update}/>}
         {tab==='rules'&&<RulesPage data={data}/>}
       </main>
+      {searchOpen&&<GlobalSearch data={data} onClose={()=>setSearchOpen(false)} onJump={jumpTo}/>}
+      {undoHint&&<UndoBar hint={undoHint} canUndo={canUndo} onUndo={doUndo} onDismiss={()=>setUndoHint(null)}/>}
+    </div>
+  );
+}
+
+// Bottom-center Gmail-style undo bar — fires after any action passed a label.
+function UndoBar({hint,canUndo,onUndo,onDismiss}){
+  return(
+    <div className="no-print" style={{position:'fixed',left:'50%',bottom:24,transform:'translateX(-50%)',background:'var(--ink)',color:'var(--paper)',padding:'10px 14px',borderRadius:8,display:'flex',alignItems:'center',gap:14,boxShadow:'0 12px 32px rgba(0,0,0,0.22)',zIndex:80,fontSize:13}}>
+      <span>{hint.label}</span>
+      {hint.kind==='action'&&canUndo&&<button onClick={onUndo} style={{background:'transparent',color:'#9fd5c3',border:'none',cursor:'pointer',fontWeight:600,fontSize:13,padding:0,textDecoration:'underline'}}>Undo</button>}
+      <button onClick={onDismiss} style={{background:'transparent',color:'var(--paper)',border:'none',cursor:'pointer',opacity:0.6,fontSize:16,padding:0,lineHeight:1}}>×</button>
+    </div>
+  );
+}
+
+// Global search (⌘K / Ctrl+K) — teachers, classes, subjects, rooms
+function GlobalSearch({data,onClose,onJump}){
+  const[q,setQ]=useState('');
+  const ref=useRef(null);
+  useEffect(()=>{if(ref.current)ref.current.focus();},[]);
+  const Q=q.trim().toLowerCase();
+  const matches=(s)=>(s||'').toString().toLowerCase().includes(Q);
+  const teacherHits=!Q?[]:data.teachers.filter(t=>matches(t.name)||matches(t.code)||matches(t.designation)).slice(0,8);
+  const classHits=!Q?[]:sortClasses(data.classes).filter(c=>matches(c.name)).slice(0,8);
+  const subjectHits=!Q?[]:data.subjects.filter(s=>matches(s.name)||matches(s.code)).slice(0,8);
+  const roomHits=!Q?[]:(data.rooms||[]).filter(r=>matches(r.name)).slice(0,8);
+  const has=teacherHits.length+classHits.length+subjectHits.length+roomHits.length>0;
+  const item=(label,meta,tab,dot)=>(
+    <button onClick={()=>onJump({tab})} style={{display:'flex',width:'100%',alignItems:'center',gap:10,padding:'8px 12px',border:'none',background:'transparent',cursor:'pointer',textAlign:'left',borderRadius:6}} onMouseEnter={e=>e.currentTarget.style.background='var(--line-soft)'} onMouseLeave={e=>e.currentTarget.style.background='transparent'}>
+      {dot&&<span style={{width:8,height:8,borderRadius:'50%',background:dot,flexShrink:0}}></span>}
+      <span style={{fontWeight:500,fontSize:13}}>{label}</span>
+      <span style={{fontSize:11,color:'var(--ink-muted)',marginLeft:'auto'}}>{meta}</span>
+    </button>
+  );
+  return(
+    <div className="modal-bg" onClick={onClose} style={{alignItems:'flex-start',paddingTop:80}}>
+      <div className="modal" onClick={e=>e.stopPropagation()} style={{maxWidth:560,width:'100%',maxHeight:'70vh'}}>
+        <div style={{padding:'14px 16px',borderBottom:'1px solid var(--line)'}}>
+          <input ref={ref} value={q} onChange={e=>setQ(e.target.value)} placeholder="Search teachers, classes, subjects, rooms…" style={{width:'100%',padding:'8px 4px',border:'none',outline:'none',fontSize:15,background:'transparent',color:'var(--ink)'}}/>
+          <div style={{fontSize:10.5,color:'var(--ink-muted)',marginTop:4,letterSpacing:'.06em'}}>Type to search · <span className="mono">Esc</span> to close</div>
+        </div>
+        <div style={{padding:'6px 6px 10px',overflowY:'auto'}}>
+          {!Q&&<div style={{padding:20,color:'var(--ink-muted)',fontSize:12.5,textAlign:'center'}}>Finds teachers by name or code (try "SAK"), classes by section, subjects by code (MAT), and rooms.</div>}
+          {Q&&!has&&<div style={{padding:20,color:'var(--ink-muted)',fontSize:12.5,textAlign:'center',fontStyle:'italic'}}>No matches for "{q}".</div>}
+          {teacherHits.length>0&&<><div style={{fontSize:10,textTransform:'uppercase',letterSpacing:'.12em',color:'var(--ink-muted)',padding:'8px 12px 4px',fontWeight:600}}>Teachers</div>{teacherHits.map(t=>(<div key={t.id}>{item(t.name+' · '+t.code,t.designation||'Teacher','teachers',t.status==='NEW'?'#d97a26':'var(--accent)')}</div>))}</>}
+          {classHits.length>0&&<><div style={{fontSize:10,textTransform:'uppercase',letterSpacing:'.12em',color:'var(--ink-muted)',padding:'8px 12px 4px',fontWeight:600}}>Classes</div>{classHits.map(c=>(<div key={c.id}>{item(c.name,c.group==='preprimary'?'Pre-Pri':c.group==='upper'?'Upper':'Primary','timetable',c.group==='preprimary'?'var(--ink-muted)':c.group==='upper'?'var(--warm)':'var(--accent)')}</div>))}</>}
+          {subjectHits.length>0&&<><div style={{fontSize:10,textTransform:'uppercase',letterSpacing:'.12em',color:'var(--ink-muted)',padding:'8px 12px 4px',fontWeight:600}}>Subjects</div>{subjectHits.map(s=>(<div key={s.id}>{item(s.name+' · '+s.code,'Subject','subjects',s.color)}</div>))}</>}
+          {roomHits.length>0&&<><div style={{fontSize:10,textTransform:'uppercase',letterSpacing:'.12em',color:'var(--ink-muted)',padding:'8px 12px 4px',fontWeight:600}}>Rooms</div>{roomHits.map(r=>(<div key={r.id}>{item(r.name,'Room','school','var(--ink-muted)')}</div>))}</>}
+        </div>
+      </div>
     </div>
   );
 }
@@ -937,9 +1037,28 @@ function Dashboard({data,setTab}){
   const pri=getTeachingCount(data.school.primaryPeriods)*data.school.days.length;
   const up=getTeachingCount(data.school.upperPeriods||data.school.primaryPeriods)*data.school.days.length;
   let filled=0,total=0;
-  data.classes.forEach(c=>{total+=(c.group==='preprimary'?preP:c.group==='upper'?up:pri);const tt=data.timetable[c.id]||{};Object.values(tt).forEach(d=>Object.values(d||{}).forEach(p=>{if(p&&p.subjectId)filled++;}));});
+  const classFilled={};
+  data.classes.forEach(c=>{total+=(c.group==='preprimary'?preP:c.group==='upper'?up:pri);const tt=data.timetable[c.id]||{};let n=0;Object.values(tt).forEach(d=>Object.values(d||{}).forEach(p=>{if(p&&p.subjectId){filled++;n++;}}));classFilled[c.id]=n;});
   const pct=total?Math.round(filled/total*100):0;
   const conflicts=findConflicts(data.timetable,data.classes,data.school);const cc=Object.keys(conflicts).length;
+  // "Needs your attention" — per-teacher load issues, coverage gaps, conflicts.
+  const loads=data.teachers.map(t=>({t,total:teacherLoad(t,data.timetable,data.classes,data.school).total,max:t.maxPeriods||42}));
+  const overloaded=loads.filter(l=>l.total>l.max);
+  const idle=loads.filter(l=>l.total===0&&l.t.designation!=='Principal');
+  const expectedByClass={};data.classes.forEach(c=>{expectedByClass[c.id]=c.group==='preprimary'?preP:c.group==='upper'?up:pri;});
+  const lowCoverage=data.classes.map(c=>({c,filled:classFilled[c.id]||0,expected:expectedByClass[c.id]||0})).filter(x=>x.expected&&x.filled<x.expected*0.5).sort((a,b)=>(a.filled/a.expected)-(b.filled/b.expected)).slice(0,4);
+  const unallocatedCells=Object.entries(data.timetable||{}).flatMap(([cId,days])=>Object.entries(days||{}).flatMap(([d,pers])=>Object.entries(pers||{}).filter(([,cell])=>cell&&!cell.teacherId).map(()=>cId))).length;
+  const attentionItems=[];
+  if(cc>0)attentionItems.push({severity:'high',text:cc+' teacher/room conflict'+(cc>1?'s':'')+' in the timetable.',action:{label:'Review',tab:'timetable'}});
+  overloaded.slice(0,3).forEach(l=>attentionItems.push({severity:'high',text:l.t.name+' is '+l.total+'/'+l.max+' this week — overloaded.',action:{label:'View',tab:'load'}}));
+  if(unallocatedCells>0)attentionItems.push({severity:'med',text:unallocatedCells+' scheduled slot'+(unallocatedCells>1?'s are':' is')+' missing a teacher.',action:{label:'Fix',tab:'timetable'}});
+  lowCoverage.slice(0,3).forEach(x=>attentionItems.push({severity:'med',text:x.c.name+' has '+(x.expected-x.filled)+' unfilled slots ('+Math.round(x.filled/x.expected*100)+'% covered).',action:{label:'Fill',tab:'timetable'}}));
+  if(idle.length>3)attentionItems.push({severity:'low',text:idle.length+' teachers have zero periods this week.',action:{label:'Allocate',tab:'allocate'}});
+  else idle.slice(0,2).forEach(l=>attentionItems.push({severity:'low',text:l.t.name+' has no periods this week.',action:{label:'Allocate',tab:'allocate'}}));
+  const allocCount=Object.keys(data.allocations||{}).length;
+  if(data.classes.length&&data.teachers.length&&allocCount===0)attentionItems.push({severity:'high',text:'No subjects are allocated yet — auto-fill cannot run.',action:{label:'Allocate',tab:'allocate'}});
+  const sevColor=s=>s==='high'?'var(--danger)':s==='med'?'var(--warm)':'var(--accent)';
+  const sevBg=s=>s==='high'?'var(--danger-soft)':s==='med'?'#fef3c7':'var(--line-soft)';
   return(<div>
     <div className="pagehead"><div><h1 className="serif">A calmer way to plan the <em>week</em>.</h1><div className="sub">Timetable builder with per-category grids, teacher load analysis, and proxy management. Tap a question below to get unstuck fast.</div></div></div>
     <div className="grid-4" style={{marginBottom:24}}>
@@ -947,6 +1066,21 @@ function Dashboard({data,setTab}){
       <div className="stat"><div className="label">Faculty</div><div className="val">{data.teachers.length}</div><div className="delta">{data.teachers.filter(t=>t.status==='OLD').length} old + {data.teachers.filter(t=>t.status==='NEW').length} new</div></div>
       <div className="stat"><div className="label">Filled</div><div className="val">{pct}<span style={{fontSize:18}}>%</span></div><div className="delta">{filled} of {total} slots</div></div>
       <div className="stat"><div className="label">Conflicts</div><div className="val" style={{color:cc?'var(--danger)':'var(--accent)'}}>{cc}</div><div className="delta">{cc?'need resolution':'all clear'}</div></div>
+    </div>
+    <div className="card">
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12,flexWrap:'wrap',gap:8}}>
+        <div className="card-title" style={{margin:0}}>Needs your attention</div>
+        <span style={{fontSize:11,color:'var(--ink-muted)'}}>{attentionItems.length} item{attentionItems.length===1?'':'s'}</span>
+      </div>
+      {attentionItems.length===0?<div style={{padding:'14px 4px',color:'var(--accent)',fontSize:13,display:'flex',alignItems:'center',gap:8}}><span style={{width:8,height:8,borderRadius:'50%',background:'var(--accent)'}}></span>All clear — no urgent issues right now.</div>:
+      attentionItems.sort((a,b)=>({high:0,med:1,low:2}[a.severity]-{high:0,med:1,low:2}[b.severity])).map((it,i)=>(
+        <div key={i} style={{display:'flex',alignItems:'center',gap:12,padding:'10px 12px',borderBottom:i<attentionItems.length-1?'1px solid var(--line-soft)':'none'}}>
+          <span style={{width:8,height:8,borderRadius:'50%',background:sevColor(it.severity),flexShrink:0}}></span>
+          <span style={{flex:1,fontSize:13,color:'var(--ink-soft)'}}>{it.text}</span>
+          <span className="badge" style={{background:sevBg(it.severity),color:sevColor(it.severity)}}>{it.severity.toUpperCase()}</span>
+          {it.action&&<button className="btn btn-ghost btn-sm" onClick={()=>setTab(it.action.tab)}>{it.action.label}</button>}
+        </div>
+      ))}
     </div>
     <div className="card"><div className="card-title">Quick Nav</div>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
@@ -1256,6 +1390,8 @@ function QualMasterPage({data,update}){
 
 // ===== Teachers =====
 function TeachersPage({data,update}){
+  const[filter,setFilter]=useState('all');
+  const[search,setSearch]=useState('');
   const[editId,setEditId]=useState(null);const[draft,setDraft]=useState(null);const[addName,setAddName]=useState('');const[addCode,setAddCode]=useState('');
   const startEdit=(t)=>{setEditId(t.id);setDraft({...t,subjects:[...(t.subjects||[])]});};
   const cancelEdit=()=>{setEditId(null);setDraft(null);};
@@ -1285,9 +1421,34 @@ function TeachersPage({data,update}){
       <div className="field"><label>Code</label><input value={addCode} onChange={e=>setAddCode(e.target.value.toUpperCase())} placeholder="Auto" maxLength={4}/></div>
       <button className="btn btn-primary" onClick={quickAdd}>Add</button>
     </div></div>
-    <div className="card" style={{padding:0,overflow:'hidden'}}>{data.teachers.length===0?<div className="empty-state"><h3 className="serif">No faculty</h3></div>:
-      <table><thead><tr><th style={{width:40}}></th><th>Code</th><th>Name</th><th>Desig.</th><th>Qualifications</th><th>Status</th><th>Subjects</th></tr></thead><tbody>
-        {data.teachers.map(t=>(
+    {/* Filter chips — "All / Overloaded / Underloaded / OLD / NEW" + search by name or code */}
+    {(()=>{return null;})()}
+    <div className="card" style={{padding:'14px 16px',marginBottom:0,borderRadius:'10px 10px 0 0',borderBottom:'none'}}>
+      <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+        <div className="tab-bar">
+          {['all','overloaded','full','underloaded','OLD','NEW'].map(k=>(<button key={k} className={`tab-btn ${filter===k?'active':''}`} onClick={()=>setFilter(k)}>{k==='all'?'All':k==='OLD'?'Old':k==='NEW'?'New':k.charAt(0).toUpperCase()+k.slice(1)}</button>))}
+        </div>
+        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name or code (e.g. SAK)" style={{flex:'1 1 220px',padding:'7px 11px',border:'1px solid var(--line)',borderRadius:6,fontSize:12.5,background:'var(--paper)'}}/>
+      </div>
+    </div>
+    {(()=>{
+      // Precompute loads so we can filter by OK/OVER/UNDER
+      const LOADS={};data.teachers.forEach(t=>{LOADS[t.id]=teacherLoad(t,data.timetable,data.classes,data.school).total;});
+      const applyFilter=t=>{
+        const load=LOADS[t.id]||0;const max=t.maxPeriods||42;const pct=max?load/max:0;
+        if(filter==='overloaded')return load>max;
+        if(filter==='full')return pct>=0.85&&load<=max;
+        if(filter==='underloaded')return pct<0.5;
+        if(filter==='OLD')return t.status==='OLD';
+        if(filter==='NEW')return t.status==='NEW';
+        return true;
+      };
+      const q=search.trim().toLowerCase();
+      const filtered=data.teachers.filter(t=>applyFilter(t)&&(!q||(t.name||'').toLowerCase().includes(q)||(t.code||'').toLowerCase().includes(q)));
+      return(
+    <div className="card" style={{padding:0,overflow:'hidden',borderRadius:'0 0 10px 10px'}}>{!filtered.length?<div className="empty-state"><h3 className="serif">{data.teachers.length?'No matches':'No faculty'}</h3>{data.teachers.length>0&&<p>Try "All" or clear the search.</p>}</div>:
+      <table><thead><tr><th style={{width:40}}></th><th>Code</th><th>Name</th><th>Desig.</th><th>Qualifications</th><th>Status</th><th>Load</th><th>Subjects</th></tr></thead><tbody>
+        {filtered.map(t=>(
           <React.Fragment key={t.id}>
           <tr style={{cursor:'pointer'}} onClick={()=>editId===t.id?null:startEdit(t)}>
             <td><div className="avatar">{t.photo?<img src={t.photo} alt=""/>:t.code.slice(0,2)}</div></td>
@@ -1296,10 +1457,11 @@ function TeachersPage({data,update}){
             <td style={{fontSize:12}}>{t.designation||'--'}</td>
             <td style={{fontSize:12}}>{getQualNames(t)||'--'}</td>
             <td>{t.status==='NEW'?<span className="badge badge-warn">NEW</span>:<span className="badge badge-ok">OLD</span>}</td>
+            <td style={{fontSize:12}}>{(()=>{const load=LOADS[t.id]||0;const max=t.maxPeriods||42;const pct=max?load/max:0;const cls=load>max?'badge-err':pct>=0.85?'badge-ok':pct<0.5?'badge-warn':'';const lab=load>max?'OVER':pct>=0.85?'FULL':pct<0.5?'LOW':'OK';return<span className={`badge ${cls}`} title={load+' / '+max+' periods/week'}>{load}/{max} · {lab}</span>;})()}</td>
             <td><div style={{display:'flex',gap:3,flexWrap:'wrap'}}>{(t.subjects||[]).length===0&&<span style={{color:'var(--ink-muted)',fontSize:11,fontStyle:'italic'}}>none</span>}{(t.subjects||[]).map(sId=>{const s=data.subjects.find(x=>x.id===sId);return s?<span key={sId} className="chip"><span className="chip-color" style={{background:s.color}}></span>{s.code}</span>:null;})}</div></td>
           </tr>
           {editId===t.id&&draft&&(
-            <tr><td colSpan={7} style={{background:'var(--bg)',padding:'20px',borderLeft:'3px solid var(--accent)'}} onClick={e=>e.stopPropagation()}>
+            <tr><td colSpan={8} style={{background:'var(--bg)',padding:'20px',borderLeft:'3px solid var(--accent)'}} onClick={e=>e.stopPropagation()}>
               <div style={{display:'flex',gap:20,marginBottom:16}}>
                 <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
                   <div className="avatar avatar-lg" onClick={handlePhoto}>{draft.photo?<img src={draft.photo} alt=""/>:'+'}</div>
@@ -1349,7 +1511,8 @@ function TeachersPage({data,update}){
           </React.Fragment>
         ))}
       </tbody></table>}
-    </div>
+    </div>);
+    })()}
   </div>);
 }
 
@@ -1588,6 +1751,7 @@ function TimetablePage({data,update}){
   const TB_DAYS=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const[classId,setClassId]=useState(data.classes[0]?data.classes[0].id:'');const[picker,setPicker]=useState(null);
   const[dayFilter,setDayFilter]=useState([]); // array of selected day indices; empty = All Days
+  const[swapAnchor,setSwapAnchor]=useState(null); // {d,p} first cell picked with Shift+click
   const toggleDay=i=>setDayFilter(a=>a.includes(i)?a.filter(x=>x!==i):[...a,i].sort((x,y)=>x-y));
   const selectAllDays=()=>setDayFilter([]);
   const showingAll=!dayFilter.length||dayFilter.length===TB_DAYS.length;
@@ -1608,7 +1772,28 @@ function TimetablePage({data,update}){
   // period grid of its own day-category (weekdays / activity / bagless).
   const periodsFor=(dIdx)=>cls?getPeriodsForClassDay(tbSchool,cls,TB_DAYS[dIdx]):data.school.primaryPeriods||[];
   const tSlotsTotal=TB_DAYS.reduce((s,_,i)=>s+getTeachingCount(periodsFor(i)),0);
-  const setCell=(sId,roomId)=>{if(!picker)return;const tId=sId?data.allocations[allocKey(classId,sId)]:null;const tt=JSON.parse(JSON.stringify(data.timetable));if(!tt[classId])tt[classId]={};if(!tt[classId][picker.d])tt[classId][picker.d]={};if(sId)tt[classId][picker.d][picker.p]={subjectId:sId,teacherId:tId||null,roomId:roomId||null};else delete tt[classId][picker.d][picker.p];update({timetable:tt});setPicker(null);};
+  const setCell=(sId,roomId)=>{if(!picker)return;const tId=sId?data.allocations[allocKey(classId,sId)]:null;const tt=JSON.parse(JSON.stringify(data.timetable));if(!tt[classId])tt[classId]={};if(!tt[classId][picker.d])tt[classId][picker.d]={};if(sId)tt[classId][picker.d][picker.p]={subjectId:sId,teacherId:tId||null,roomId:roomId||null};else delete tt[classId][picker.d][picker.p];update({timetable:tt},'Assigned to '+(data.school.days||[])[picker.d]+' P'+(picker.p+1));setPicker(null);};
+  // Shift+click → swap. First shifted cell becomes the anchor; second shifted
+  // cell swaps contents with the anchor.
+  const onCellClick=(e,d,p)=>{
+    if(e.shiftKey){
+      if(!swapAnchor){setSwapAnchor({d,p});return;}
+      if(swapAnchor.d===d&&swapAnchor.p===p){setSwapAnchor(null);return;}
+      const tt=JSON.parse(JSON.stringify(data.timetable));
+      if(!tt[classId])tt[classId]={};
+      const a=(tt[classId][swapAnchor.d]&&tt[classId][swapAnchor.d][swapAnchor.p])||null;
+      const b=(tt[classId][d]&&tt[classId][d][p])||null;
+      if(!tt[classId][swapAnchor.d])tt[classId][swapAnchor.d]={};
+      if(!tt[classId][d])tt[classId][d]={};
+      if(b)tt[classId][swapAnchor.d][swapAnchor.p]=b;else delete tt[classId][swapAnchor.d][swapAnchor.p];
+      if(a)tt[classId][d][p]=a;else delete tt[classId][d][p];
+      update({timetable:tt},'Swapped two cells');
+      setSwapAnchor(null);
+      return;
+    }
+    setSwapAnchor(null);
+    setPicker({d,p});
+  };
   const clearClass=()=>{if(!confirm('Clear?'))return;const tt={...data.timetable};delete tt[classId];update({timetable:tt});};
 
   // Conflict-aware auto-fill: iterates each day using THAT day's category periods
@@ -1797,6 +1982,7 @@ function TimetablePage({data,update}){
         {baglessIdxs.length>0&&<button className={`tab-btn ${onBagless?'active':''}`} onClick={()=>setDayFilter(baglessIdxs)}>Bag Less ({baglessIdxs.length})</button>}
       </div>
       <span style={{fontSize:11,color:'var(--ink-muted)'}}>{showingAll?'All '+TB_DAYS.length+' days':dayFilter.length+' of '+TB_DAYS.length+' days'}</span>
+      <span style={{marginLeft:'auto',fontSize:10.5,color:swapAnchor?'var(--warm)':'var(--ink-muted)',fontWeight:swapAnchor?600:400}}>{swapAnchor?'⇆ Swap anchor set · Shift+click another cell':'Tip: click to edit · Shift+click two cells to swap'}</span>
     </div>
       );
     })()}
@@ -1823,7 +2009,9 @@ function TimetablePage({data,update}){
               const subj=cell?data.subjects.find(s=>s.id===cell.subjectId):null;const teacher=cell?data.teachers.find(t=>t.id===cell.teacherId):null;
               const conType=conflicts[`${classId}|${di}|${pi}`];
               const conClass=conType==='teacher'||conType==='both'?'conflict':conType==='room'?'room-conflict':'';
-              return<div key={di} className={`tt-cell ${!cell?'empty':''} ${conClass}`} style={subj?{background:subj.color+'10',borderLeft:`3px solid ${subj.color}`}:{}} onClick={()=>setPicker({d:di,p:pi})}>{cell&&subj?(<><div className="subj"><span className="chip-color" style={{background:subj.color}}></span>{subj.code}</div><div className="teach">{teacher?teacher.code:'--'}</div></>):'+ assign'}</div>;
+              const isAnchor=swapAnchor&&swapAnchor.d===di&&swapAnchor.p===pi;
+              const anchorStyle=isAnchor?{outline:'2px dashed var(--warm)',outlineOffset:'-2px'}:{};
+              return<div key={di} className={`tt-cell ${!cell?'empty':''} ${conClass}`} style={{...(subj?{background:subj.color+'10',borderLeft:`3px solid ${subj.color}`}:{}),...anchorStyle}} onClick={e=>onCellClick(e,di,pi)} title={swapAnchor?'Shift+click to swap with anchor':'Click to edit · Shift+click to swap'}>{cell&&subj?(<><div className="subj"><span className="chip-color" style={{background:subj.color}}></span>{subj.code}</div><div className="teach">{teacher?teacher.code:'--'}</div></>):'+ assign'}</div>;
             })}</div>))}
         </div>}
       </div>);
@@ -2084,6 +2272,54 @@ function ProxyPage({data,update}){
 
   const assignProxy=(slotKey,proxyId)=>setAssignments(a=>({...a,[slotKey]:proxyId}));
 
+  // Auto-suggest proxies: for each absent teacher's slot pick the best candidate
+  // — free at that time, ideally teaches the same subject, lightest weekly load.
+  const autoSuggest=()=>{
+    if(!absentSchedules.length){alert('Mark absent teachers first.');return;}
+    const weekLoad={};
+    data.teachers.forEach(t=>{weekLoad[t.id]=teacherLoad(t,data.timetable,data.classes,data.school).total;});
+    const next={...assignments};
+    absentSchedules.forEach(({teacher:at,schedule})=>{
+      schedule.forEach(sl=>{
+        const slotKey=at.id+'|'+sl.start+'|'+sl.end+'|'+sl.classId+'|'+sl.subjectId;
+        if(next[slotKey])return; // respect existing picks
+        const free=findFreeTeachers(dayIdx,sl.start,sl.end,data.timetable,data.classes,data.school,data.teachers,absentIds);
+        const sameSubj=free.filter(t=>(t.subjects||[]).includes(sl.subjectId));
+        const pool=sameSubj.length?sameSubj:free;
+        if(!pool.length)return;
+        const picked=pool.slice().sort((a,b)=>(weekLoad[a.id]||0)-(weekLoad[b.id]||0))[0];
+        if(picked){next[slotKey]=picked.id;weekLoad[picked.id]=(weekLoad[picked.id]||0)+1;}
+      });
+    });
+    setAssignments(next);
+  };
+  const clearSuggestions=()=>{if(confirm('Clear all proxy assignments on this screen?'))setAssignments({});};
+
+  // WhatsApp share — uses the wa.me deep link with a pre-filled text summary.
+  const shareWhatsApp=()=>{
+    const byProxy={};
+    Object.entries(assignments).forEach(([key,proxyId])=>{if(!proxyId)return;
+      const parts=key.split('|');const absent=data.teachers.find(t=>t.id===parts[0]);const proxy=data.teachers.find(t=>t.id===proxyId);
+      const cls=data.classes.find(c=>c.id===parts[3]);const subj=data.subjects.find(s=>s.id===parts[4]);
+      if(!proxy)return;if(!byProxy[proxyId])byProxy[proxyId]={teacher:proxy,slots:[]};
+      byProxy[proxyId].slots.push({start:parts[1],end:parts[2],className:cls?cls.name:'?',subjectName:subj?subj.name:'?',absentName:absent?absent.name:'?'});
+    });
+    if(!Object.keys(byProxy).length){alert('No proxy assignments to share.');return;}
+    const b=(typeof getBranding==='function')?getBranding():{name:'The World School, ICSE'};
+    const dayName=data.school.days[dayIdx];const date=compactDate();
+    let lines=['*'+b.name+' — Proxy Schedule*',dayName+' · '+date,''];
+    Object.values(byProxy).forEach(({teacher:pr,slots})=>{
+      lines.push('*'+pr.name+' ('+pr.code+')*');
+      slots.sort((a,b)=>a.start.localeCompare(b.start)).forEach(s=>{
+        lines.push('  • '+s.start+'–'+s.end+' · '+s.className+' · '+s.subjectName+' (for '+s.absentName+')');
+      });
+      lines.push('');
+    });
+    lines.push('— Timetable Studio '+(typeof APP_VERSION!=='undefined'?APP_VERSION:''));
+    const url='https://wa.me/?text='+encodeURIComponent(lines.join('\n'));
+    window.open(url,'_blank');
+  };
+
   const printProxySlips=()=>{
     // Gather proxy assignments per proxy teacher
     const byProxy={};
@@ -2130,7 +2366,15 @@ function ProxyPage({data,update}){
 
   return(<div>
     <div className="pagehead"><div><h1 className="serif">Proxy <em>Management</em></h1><div className="sub">Mark absent teachers, view their schedule, assign free substitutes, and print reports.</div></div>
-      {Object.keys(assignments).filter(k=>assignments[k]).length>0&&<div className="actions"><button className="btn btn-ghost" onClick={printConsolidatedReport}>Consolidated Report</button><button className="btn btn-primary" onClick={printProxySlips}>Print Proxy Slips</button></div>}
+      <div className="actions" style={{flexWrap:'wrap'}}>
+        {absentIds.length>0&&<button className="btn btn-ghost" onClick={autoSuggest} title="Pick the lightest-load free teacher for each empty slot">Suggest proxies</button>}
+        {Object.keys(assignments).filter(k=>assignments[k]).length>0&&<>
+          <button className="btn btn-ghost" onClick={clearSuggestions}>Clear</button>
+          <button className="btn btn-ghost" onClick={shareWhatsApp} title="Share a text summary on WhatsApp">WhatsApp Share</button>
+          <button className="btn btn-ghost" onClick={printConsolidatedReport}>Consolidated Report</button>
+          <button className="btn btn-primary" onClick={printProxySlips}>Print Proxy Slips</button>
+        </>}
+      </div>
     </div>
 
     <div className="card">
