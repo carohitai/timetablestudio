@@ -1330,8 +1330,15 @@ function GlobalSearch({data,onClose,onJump}){
 const HOW_TO=[
   {cat:'Getting Started',color:'var(--accent)',items:[
     {q:'How do I set up the school for the first time?',a:['Go to <strong>Day Structure</strong> and upload your logo, fill in the school name + tagline, then pick a Session preset (Summer / Normal / Winter).','Categorise your working days into <em>Weekdays</em> / <em>Activity Days</em> / <em>Bag Less Day</em> and edit the period grid per category + group (Pre-Pri / Primary / Upper).','Move on to <strong>Classes</strong>, <strong>Faculty</strong>, <strong>Subjects</strong>, and <strong>Allocations</strong> in that order.']},
-    {q:'Where is my data saved?',a:['Everything lives in your browser\'s local storage — no account or cloud sign-up needed.','Use the <strong>Save as File</strong> button (sidebar) to download a standalone HTML backup you can reopen on any machine.','If the site is hosted on Vercel with cloud sync configured, the <strong>☁ Cloud Sync</strong> panel lets a whole team share one dataset by passcode.']},
+    {q:'Where is my data saved?',a:['<strong>Two places, automatically.</strong> Your browser\'s local storage (<code>tws_timetable_v8</code>) gets written on every edit, and the app syncs the same snapshot to a shared <strong>Supabase</strong> row a couple of seconds after you stop typing.','Because the cloud row is shared, every signed-in device sees the same timetable — edit on a laptop, the phone picks it up within seconds.','Use the <strong>Save as File</strong> button (sidebar) to download a standalone HTML backup you can reopen on any machine, or <strong>Export JSON</strong> for a plain-data snapshot.']},
     {q:'How do I install the app on my phone / desktop?',a:['Open the site in Chrome or Edge. Look for the "Install" icon in the address bar, or go to browser menu → <em>Install app</em> / <em>Add to Home screen</em>.','After install, it runs like a normal app and works offline (PWA).']}
+  ]},
+  {cat:'Sign-in & Cloud Sync',color:'#0d4f3c',items:[
+    {q:'Why am I asked to sign in with Microsoft?',a:['Access is gated by your school\'s Microsoft 365 tenant — only <code>@kolteworldschool.com</code> accounts can open the app (see <code>SCHOOL_EMAIL_DOMAIN</code> in <code>index.html</code>).','Personal Microsoft accounts and other tenants are rejected by Azure before Supabase ever sees them, so there\'s no way to bypass the gate.']},
+    {q:'What do the sync chip states mean?',a:['The small chip in the sidebar footer is the only sync surface — there\'s no Push / Pull button anymore.','<strong>☁ Synced Xs ago</strong> — local and cloud match.','<strong>⇡ / ⇣ Syncing…</strong> — a push or pull is in flight (pushes fire 2 s after your last edit).','<strong>⚠ Offline — will retry</strong> — the last sync failed (no network or Supabase down). Your edits are safe locally; the next edit retries the push.','<strong>⚠ Conflict — resolve</strong> — someone else pushed while you had unsynced edits. The chip expands with <em>Keep mine</em> / <em>Use cloud</em> buttons.']},
+    {q:'How do I restore an earlier version?',a:['Click the sync chip in the sidebar — it opens the <strong>Cloud Backups</strong> modal with the last ~20 auto-snapshots (one per ~12 hours of active editing).','Pick a snapshot and hit <em>Restore</em>; your local copy is overwritten and the ambient sync propagates the restored state to the cloud within a couple of seconds.']},
+    {q:'How do I move data to a new device?',a:['Just sign in with the same Microsoft account on the new device. The app auto-pulls the cloud snapshot before showing the UI — no import needed.','If you want a portable copy outside the cloud, use Export JSON and Import JSON from the sidebar.']},
+    {q:'How do I sign out?',a:['Sidebar header → <strong>⎋</strong> icon (next to the sidebar collapse toggle). It wipes the Supabase session and the LoginGate re-appears. Closing the tab alone does not sign out.']}
   ]},
   {cat:'Day Structure & Periods',color:'var(--accent-soft)',items:[
     {q:'How do I mark a period as Recess / Break?',a:['In the Period Grid, use the <strong>Type</strong> dropdown on that row and pick "Recess / Break".','Periods whose name starts with Recess, Break, Lunch, Interval, Tiffin, Assembly, Prayer, Orientation, or Homeroom are also auto-detected as non-teaching, so subjects won\'t land there during Auto-fill.']},
@@ -1361,9 +1368,9 @@ const HOW_TO=[
     {q:'Where is the "last updated" timestamp coming from?',a:['The app records the moment data was last saved (any edit) and shows it on every export header and footer strip.']}
   ]},
   {cat:'Backups & Data Safety',color:'#525252',items:[
-    {q:'How do I back up my data?',a:['Sidebar → <strong>Export JSON</strong>. The file name defaults to <code>TWS_DDMMYY_HHMM.json</code>. Keep it on a shared drive or email it to yourself.','The "Save Successfully" toast after Day Structure edits also offers one-click JSON export.']},
-    {q:'How do I move data to another device?',a:['Device A: Export JSON → share the file. Device B: open the site → sidebar → <strong>Import JSON</strong>.','Or use Cloud Sync: same passcode on both devices, Push on A, Pull on B.']},
-    {q:'I made a bad change. Can I undo?',a:['There is no single-click undo — restore the most recent JSON backup via Import JSON.','Get into the habit of exporting JSON after any major change.']}
+    {q:'How do I back up my data?',a:['Backups are automatic — every ambient push also inserts a snapshot into the <code>tws_backups</code> table, rate-limited to one per ~12 hours so the table stays small.','Click the sync chip in the sidebar to browse the last ~20 snapshots and restore any of them.','For a portable copy, use sidebar → <strong>Export JSON</strong>; the file name defaults to <code>TWS_DDMMYY_HHMM.json</code>.']},
+    {q:'I made a bad change. Can I undo?',a:['Yes — press <kbd>⌘Z</kbd> (or <kbd>Ctrl+Z</kbd>) to undo the last edit, up to 50 steps. <kbd>⌘⇧Z</kbd> redoes.','The Undo / Redo buttons at the bottom of the sidebar do the same thing, and a small toast appears after each major action offering a one-click undo.','For anything older than the in-session history, click the sync chip → <strong>Cloud Backups</strong> → Restore a ~12-hour-old snapshot.']},
+    {q:'What if I\'m offline when I edit?',a:['Every edit is written to local storage first, so nothing is lost when there\'s no network. The chip flips to <strong>Offline — will retry</strong>, and as soon as connectivity returns the next edit kicks the debounced push again.','Two devices editing while both offline is the one edge case — when they come back online, the later push wins in the cloud, but whichever device flipped to <strong>Conflict</strong> lets you pick <em>Keep mine</em> and re-push.']}
   ]}
 ];
 function HowToAccordion(){
@@ -2852,6 +2859,15 @@ function RulesPage({data}){
         <div className="stat"><div className="label">Teachers</div><div className="val">{(data.teachers||[]).length}</div><div className="delta">{nonPrincipals.length} non-principal + 1 principal</div></div>
       </div>
     </div>
+    <div className="card">
+      <div className="card-title">Access & Cloud Sync</div>
+      <Rule n="11" title="Microsoft SSO gate (single-tenant)">Only Microsoft 365 accounts in the school’s Azure AD tenant can sign in. The app also enforces <code>SCHOOL_EMAIL_DOMAIN</code> (currently <strong>@kolteworldschool.com</strong>) client-side as a second check — any other domain is signed out immediately.</Rule>
+      <Rule n="12" title="Shared canonical store">All signed-in devices read from and write to a single Supabase row (<code>tws_timetables</code>, id <code>main</code>). Local storage is a cache; the cloud row is the source of truth.</Rule>
+      <Rule n="13" title="Debounced auto-push (~2 s)">Every edit resets a 2-second timer; when it fires, the full snapshot is written to the cloud and tagged with your school email in <code>updated_by</code>. Rapid chains of edits coalesce into one push.</Rule>
+      <Rule n="14" title="Realtime apply with conflict guard">Supabase Realtime streams foreign pushes to every open device. If your local copy is clean, the change is applied silently and a toast shows "Updated by &lt;email&gt;". If you have unsynced edits at the same moment, the sync chip flips to <strong>Conflict</strong> and offers <em>Keep mine</em> / <em>Use cloud</em> — no silent overwrites.</Rule>
+      <Rule n="15" title="Auto-backup cadence (~12 h)">Each successful push also attempts an insert into <code>tws_backups</code>, rate-limited to one snapshot per ~12 hours per workspace. The sync chip opens the Cloud Backups modal for one-click restore.</Rule>
+      <Rule n="16" title="Undo history (in-session)">Every edit goes onto an in-memory stack, capped at 50 steps. <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd> (or the sidebar Undo / Redo buttons) walk it. A pull or restore clears the stack to avoid applying stale states.</Rule>
+    </div>
     <div className="card" style={{background:'var(--bg)'}}>
       <div className="card-title">What the tool does NOT enforce</div>
       <ul style={{paddingLeft:20,fontSize:13,color:'var(--ink-soft)',lineHeight:1.8}}>
@@ -2859,6 +2875,7 @@ function RulesPage({data}){
         <li>Lab / paired-period blocks — double-period labs must be arranged manually.</li>
         <li>Teacher personal preferences (e.g. "no periods on Wednesday morning") unless modeled via the lecture-based availability window.</li>
         <li>Break-time supervision duty rosters — proxy slips cover absence only.</li>
+        <li>Per-user row-level access in Supabase — everyone in the tenant has equal read/write on the shared row. See the README for the recommended <code>auth.role() = 'authenticated'</code> hardening policy.</li>
       </ul>
     </div>
   </div>);
