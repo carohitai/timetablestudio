@@ -1105,7 +1105,7 @@ function App(){
     });
     if(label)setUndoHint({label,kind:'action',ts:Date.now()});
   };
-  const tabs=[{id:'dashboard',num:'01',name:'Overview'},{id:'school',num:'02',name:'Day Structure'},{id:'classes',num:'03',name:'Classes'},{id:'qualmaster',num:'04',name:'Qual. Master'},{id:'teachers',num:'05',name:'Faculty'},{id:'subjects',num:'06',name:'Subjects'},{id:'allocate',num:'07',name:'Allocations'},{id:'timetable',num:'08',name:'Timetable'},{id:'load',num:'09',name:'Teacher Load'},{id:'proxy',num:'10',name:'Proxy Mgmt'},{id:'rules',num:'11',name:'Rules'}];
+  const tabs=[{id:'dashboard',num:'01',name:'Overview'},{id:'school',num:'02',name:'Day Structure'},{id:'classes',num:'03',name:'Classes'},{id:'qualmaster',num:'04',name:'Qual. Master'},{id:'teachers',num:'05',name:'Faculty'},{id:'subjects',num:'06',name:'Subjects'},{id:'allocate',num:'07',name:'Allocations'},{id:'timetable',num:'08',name:'Timetable'},{id:'load',num:'09',name:'Teacher Load'},{id:'proxy',num:'10',name:'Proxy Mgmt'},{id:'rules',num:'11',name:'Rules'},{id:'teaching',num:'12',name:'Teaching Methods'}];
   const jumpTo=(target)=>{setSearchOpen(false);if(target&&target.tab)setTab(target.tab);};
   const canUndo=pastRef.current.length>0;const canRedo=futureRef.current.length>0;
   return(
@@ -1146,6 +1146,7 @@ function App(){
         {tab==='load'&&<LoadPage data={data}/>}
         {tab==='proxy'&&<ProxyPage data={data} update={update}/>}
         {tab==='rules'&&<RulesPage data={data}/>}
+        {tab==='teaching'&&<TeachingMethodsPage/>}
       </main>
       {searchOpen&&<GlobalSearch data={data} onClose={()=>setSearchOpen(false)} onJump={jumpTo}/>}
       {undoHint&&<UndoBar hint={undoHint} canUndo={canUndo} onUndo={doUndo} onDismiss={()=>setUndoHint(null)}/>}
@@ -1366,6 +1367,11 @@ const HOW_TO=[
   {cat:'Exports & Printing',color:'#047857',items:[
     {q:'How do I get a PDF with the school logo?',a:['Every Export button opens a branded print-ready sheet with the school logo in the header, a Kolte Foundation credit, a footer strip with the app version and last-update timestamp, and colour-coded tables.','Use the browser print dialog → "Save as PDF". Ensure <em>Background graphics</em> is enabled so the colours come through.']},
     {q:'Where is the "last updated" timestamp coming from?',a:['The app records the moment data was last saved (any edit) and shows it on every export header and footer strip.']}
+  ]},
+  {cat:'Teaching Methods',color:'#003F87',items:[
+    {q:'What is the Teaching Methods tab?',a:['<strong>12 · Teaching Methods</strong> opens a self-contained reference dashboard for TWS faculty — Bloom\'s Taxonomy, NEP 2020 pillars, modern pedagogies, a SMART-objective generator, and a lesson-plan builder.','It\'s embedded as an iframe over <code>Teaching-Methodologies-Dashboard.html</code> in the repo, so the file can be edited or replaced independently of the main app and the in-app view picks up changes on the next page load.']},
+    {q:'How do I use it full-screen on a small device?',a:['Use the <em>⛶ Full-screen</em> button at the top of the panel. Press <kbd>Esc</kbd> or hit <em>Exit full-screen</em> to come back to the main app.','For a brand-new tab (e.g. to print or share a link), use <em>↗ New tab</em>.']},
+    {q:'Does it sync to the cloud or save anything I do inside it?',a:['No. The Teaching Methods dashboard is read-only reference content. Any picks you make inside its Lesson Builder live only in that tab and are not stored in <code>tws_timetable_v8</code> or pushed to Supabase.','If you want to keep a lesson plan, use the dashboard\'s own Print / Save buttons.']}
   ]},
   {cat:'Backups & Data Safety',color:'#525252',items:[
     {q:'How do I back up my data?',a:['Backups are automatic — every ambient push also inserts a snapshot into the <code>tws_backups</code> table, rate-limited to one per ~12 hours so the table stays small.','Click the sync chip in the sidebar to browse the last ~20 snapshots and restore any of them.','For a portable copy, use sidebar → <strong>Export JSON</strong>; the file name defaults to <code>TWS_DDMMYY_HHMM.json</code>.']},
@@ -2868,6 +2874,10 @@ function RulesPage({data}){
       <Rule n="15" title="Auto-backup cadence (~12 h)">Each successful push also attempts an insert into <code>tws_backups</code>, rate-limited to one snapshot per ~12 hours per workspace. The sync chip opens the Cloud Backups modal for one-click restore.</Rule>
       <Rule n="16" title="Undo history (in-session)">Every edit goes onto an in-memory stack, capped at 50 steps. <kbd>⌘Z</kbd> / <kbd>⌘⇧Z</kbd> (or the sidebar Undo / Redo buttons) walk it. A pull or restore clears the stack to avoid applying stale states.</Rule>
     </div>
+    <div className="card">
+      <div className="card-title">Reference content (read-only)</div>
+      <Rule n="17" title="Teaching Methods dashboard is sandboxed">Tab <strong>12 · Teaching Methods</strong> embeds <code>Teaching-Methodologies-Dashboard.html</code> in an iframe. Its CSS, fonts, and inline JS are isolated from the main app, and nothing the user does inside it (Lesson Builder picks, quiz answers) is written to <code>tws_timetable_v8</code> or pushed to Supabase.</Rule>
+    </div>
     <div className="card" style={{background:'var(--bg)'}}>
       <div className="card-title">What the tool does NOT enforce</div>
       <ul style={{paddingLeft:20,fontSize:13,color:'var(--ink-soft)',lineHeight:1.8}}>
@@ -2879,6 +2889,34 @@ function RulesPage({data}){
       </ul>
     </div>
   </div>);
+}
+
+// Teaching Methodologies dashboard — rendered as a sandboxed iframe so its
+// CSS, fonts, and inline JS stay isolated from the main app. The HTML file
+// sits next to index.html and can be edited independently; this view picks
+// up changes on the next page load.
+function TeachingMethodsPage(){
+  const[fs,setFs]=useState(false);
+  const src='Teaching-Methodologies-Dashboard.html';
+  useEffect(()=>{if(!fs)return;const h=e=>{if(e.key==='Escape')setFs(false);};document.addEventListener('keydown',h);return()=>document.removeEventListener('keydown',h);},[fs]);
+  return(
+    <div>
+      <div className="pagehead" style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:14,flexWrap:'wrap'}}>
+        <div>
+          <h1 className="serif">Teaching <em>Methods</em></h1>
+          <div className="sub">Bloom's Taxonomy, NEP 2020 pillars, modern pedagogies, and a SMART-objective lesson builder for TWS faculty.</div>
+        </div>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setFs(v=>!v)}>{fs?'↙ Exit full-screen':'⛶ Full-screen'}</button>
+          <a className="btn btn-ghost btn-sm" href={src} target="_blank" rel="noopener" title="Open in a new tab">↗ New tab</a>
+        </div>
+      </div>
+      <div className="card" style={{padding:0,overflow:'hidden',background:'#F4F9FB',...(fs?{position:'fixed',inset:0,zIndex:200,borderRadius:0,border:'none'}:{})}}>
+        {fs&&<button onClick={()=>setFs(false)} style={{position:'absolute',top:12,right:14,zIndex:201,padding:'6px 12px',border:'1px solid var(--line)',borderRadius:6,background:'#fff',cursor:'pointer',fontSize:12,fontWeight:600}}>↙ Exit full-screen (Esc)</button>}
+        <iframe src={src} title="Teaching Methodologies Dashboard" style={{width:'100%',height:fs?'100vh':'calc(100vh - 220px)',minHeight:560,border:'none',display:'block'}} loading="lazy"/>
+      </div>
+    </div>
+  );
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
