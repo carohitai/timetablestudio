@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Teaching Methodologies Dashboard — TWS ICSE | Academic Planning 2026-27</title>
+<style>
+  /* ============ CORE TOKENS — TWS BRAND ============ */
+  :root{
+    /* TWS brand palette (extracted from logo + letterhead) */
+    --navy:#003F87;       /* TWS Navy — primary text & structural */
+    --navy-2:#0055A4;     /* TWS Blue 600 */
+    --teal:#54C0CC;       /* TWS Aqua — signature ribbon colour */
+    --teal-2:#3FB1BE;     /* deeper aqua */
+    --teal-3:#0D8D9A;     /* aqua hover/active */
+    --cyan:#18B4F0;       /* TWS Cyan — interactive accent */
+    --aqua-light:#D5EFF1; /* light aqua wash */
+    --cream:#FFFCF5;      /* letterhead cream */
+    --amber:#F59E0B;
+    --rose:#E11D48;
+    --indigo:#003F87;     /* alias to navy for cohesion */
+    --green:#16A34A;
+    --bg:#F4F9FB;         /* page bg — pale aqua-tinted */
+    --card:#FFFFFF;
+    --ink:#0B2545;
+    --ink-2:#2C4570;
+    --muted:#5C7390;
+    --line:#DCE8EE;
+    --line-2:#B7CFDA;
+    --shadow:0 6px 24px rgba(0,63,135,.08);
+    --shadow-lg:0 18px 50px rgba(0,63,135,.18);
+    --radius:14px;
+
+    /* Bloom's pyramid — tinted to harmonise with TWS palette
+       (kept distinct for pedagogy but moved toward blues/teals where possible) */
+    --b1:#E11D48;  /* Remember — rose */
+    --b2:#F59E0B;  /* Understand — amber */
+    --b3:#54C0CC;  /* Apply — TWS aqua */
+    --b4:#0D8D9A;  /* Analyze — aqua deep */
+    --b5:#006CB4;  /* Evaluate — TWS blue */
+    --b6:#003F87;  /* Create — TWS navy */
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:'Inter',-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg);line-height:1.55;-webkit-font-smoothing:antialiased}
+  a{color:var(--teal);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  header.top{background:linear-gradient(135deg,#003F87 0%,#006CB4 45%,#18B4F0 90%,#54C0CC 130%);color:#fff;padding:24px 24px 22px;position:relative;overflow:hidden}
+  header.top::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 88% 18%,rgba(255,255,255,.10),transparent 42%),radial-gradient(circle at 12% 85%,rgba(84,192,204,.28),transparent 50%);pointer-events:none}
+  .head-wrap{max-width:1280px;margin:0 auto;position:relative;z-index:1}
+  .head-row{display:flex;align-items:center;gap:18px;margin-bottom:14px}
+  .head-logo{
+    width:72px;height:72px;background:#fff;border-radius:14px;
+    display:flex;align-items:center;justify-content:center;padding:6px;
+    box-shadow:0 6px 20px rgba(0,0,0,.18);flex-shrink:0;
+  }
+  .head-logo img{max-width:100%;max-height:100%;display:block}
+  .school-mark{display:inline-flex;align-items:center;gap:10px;background:rgba(255,255,255,.14);padding:6px 12px;border-radius:999px;font-size:12px;letter-spacing:.5px;text-transform:uppercase;font-weight:600;backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.18)}
+  .school-mark .dot{width:8px;height:8px;border-radius:50%;background:#54C0CC;box-shadow:0 0 0 3px rgba(84,192,204,.3)}
+  .tagline{font-size:11px;opacity:.85;letter-spacing:1.5px;text-transform:uppercase;margin-top:6px;font-weight:600}
+  h1.title{margin:6px 0 4px;font-size:32px;font-weight:800;letter-spacing:-.5px}
+  .subtitle{margin:0;font-size:15px;opacity:.92;max-width:760px}
+  .hero-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:22px;max-width:920px}
+  .hero-stat{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:12px;padding:12px 14px;backdrop-filter:blur(6px)}
+  .hero-stat b{display:block;font-size:22px;font-weight:800}
+  .hero-stat span{font-size:12px;opacity:.9;text-transform:uppercase;letter-spacing:.5px}
+
+  nav.tabs{position:sticky;top:0;z-index:50;background:#fff;border-bottom:2px solid var(--teal);box-shadow:0 2px 0 rgba(0,63,135,.04)}
+  .tabs-inner{max-width:1280px;margin:0 auto;display:flex;gap:4px;padding:8px 16px;overflow-x:auto;scrollbar-width:thin}
+  .tab{flex:0 0 auto;padding:10px 14px;font-size:13.5px;font-weight:600;color:var(--ink-2);background:transparent;border:none;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .15s ease}
+  .tab:hover{background:var(--aqua-light);color:var(--navy)}
+  .tab.active{background:var(--navy);color:#fff;box-shadow:0 4px 10px rgba(0,63,135,.25)}
+  .tab .tab-ico{font-size:16px}
+
+  main{max-width:1280px;margin:0 auto;padding:24px 16px 80px}
+  section.panel{display:none}
+  section.panel.active{display:block;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  h2.section-title{font-size:24px;margin:8px 0 4px;color:var(--navy);font-weight:800;letter-spacing:-.3px}
+  p.section-lead{margin:0 0 18px;color:var(--muted);max-width:820px}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;box-shadow:var(--shadow)}
+  .grid{display:grid;gap:16px}
+  .g-2{grid-template-columns:repeat(2,1fr)}
+  .g-3{grid-template-columns:repeat(3,1fr)}
+  .g-4{grid-template-columns:repeat(4,1fr)}
+  @media(max-width:980px){.g-2,.g-3,.g-4{grid-template-columns:1fr}}
+  @media(max-width:1100px) and (min-width:981px){.g-4{grid-template-columns:repeat(2,1fr)}}
+
+  .home-card{border-left:5px solid var(--teal);padding:22px;cursor:pointer;transition:transform .15s, box-shadow .15s}
+  .home-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg);border-left-color:var(--cyan)}
+  .home-card h3{margin:0 0 6px;font-size:17px;color:var(--navy)}
+  .home-card p{margin:0;color:var(--muted);font-size:13.5px}
+  .home-card .home-ico{width:44px;height:44px;border-radius:12px;background:var(--aqua-light);display:flex;align-items:center;justify-content:center;font-size:22px;margin-bottom:10px;color:var(--navy)}
+
+  .info-strip{background:linear-gradient(90deg,var(--cream),#FFF8E1);border:1px solid #F5E6BD;border-radius:12px;padding:14px 16px;color:#7A5C12;font-size:13.5px;margin-bottom:20px;border-left:4px solid var(--teal)}
+
+  .bloom-pyramid{display:flex;flex-direction:column-reverse;gap:6px;margin:0 auto;max-width:560px}
+  .bloom-row{color:#fff;padding:14px 18px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;font-weight:700;letter-spacing:.3px;transition:transform .15s, box-shadow .15s, filter .15s;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+  .bloom-row:hover{transform:translateX(4px);filter:brightness(1.08)}
+  .bloom-row.b1{background:var(--b1);width:55%;align-self:center}
+  .bloom-row.b2{background:var(--b2);width:64%;align-self:center}
+  .bloom-row.b3{background:var(--b3);width:73%;align-self:center;color:#fff}
+  .bloom-row.b4{background:var(--b4);width:82%;align-self:center}
+  .bloom-row.b5{background:var(--b5);width:91%;align-self:center}
+  .bloom-row.b6{background:var(--b6);width:100%;align-self:center}
+  .bloom-row .lev{opacity:.9;font-weight:600;font-size:12px;text-transform:uppercase}
+
+  .bloom-detail{margin-top:18px;padding:18px;border-radius:12px;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);border-top:6px solid var(--teal)}
+  .bloom-detail h3{margin:0 0 4px;font-size:18px;color:var(--navy)}
+  .bloom-detail .bd-meta{font-size:13px;color:var(--muted);margin-bottom:14px}
+  .bd-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:780px){.bd-grid{grid-template-columns:1fr}}
+  .bd-block h4{margin:0 0 8px;font-size:13px;text-transform:uppercase;color:var(--ink-2);letter-spacing:.5px}
+  .verb-chip-row{display:flex;flex-wrap:wrap;gap:6px}
+  .verb-chip{display:inline-block;padding:5px 10px;border-radius:999px;background:#f1f5f9;color:var(--navy);font-size:12.5px;font-weight:600;border:1px solid #e2e8f0}
+  .stem-list{margin:0;padding-left:18px;color:var(--ink-2);font-size:13.5px}
+  .stem-list li{margin-bottom:5px}
+  .icse-example{background:#EFF8FA;border:1px solid #BFE3E9;border-left:4px solid var(--teal);border-radius:10px;padding:12px 14px;font-size:13.5px;color:#0B3D49;margin-top:10px}
+  .icse-example b{color:var(--navy)}
+
+  .nep-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  @media(max-width:980px){.nep-grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:600px){.nep-grid{grid-template-columns:1fr}}
+  .nep-pillar{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;border-top:4px solid var(--navy)}
+  .nep-pillar:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-top-color:var(--teal)}
+  .nep-pillar h4{margin:0 0 6px;font-size:15px;color:var(--navy)}
+  .nep-pillar p{margin:0 0 8px;font-size:13px;color:var(--muted)}
+  .nep-pillar .nep-tag{display:inline-block;padding:3px 8px;border-radius:6px;background:var(--aqua-light);color:var(--navy);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+  .stage-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 22px}
+  .stage{padding:14px 12px;border-radius:10px;color:#fff;text-align:center}
+  .stage.s1{background:#54C0CC}
+  .stage.s2{background:#18B4F0}
+  .stage.s3{background:#006CB4}
+  .stage.s4{background:#003F87}
+  .stage b{display:block;font-size:18px;font-weight:800}
+  .stage span{font-size:12px;opacity:.95}
+
+  .meth-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;gap:8px;border-top:4px solid var(--teal)}
+  .meth-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-top-color:var(--cyan)}
+  .meth-head{display:flex;align-items:center;gap:10px}
+  .meth-ico{width:38px;height:38px;border-radius:10px;background:var(--aqua-light);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--navy)}
+  .meth-card h4{margin:0;font-size:15px;color:var(--navy)}
+  .meth-card .meth-by{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+  .meth-card p{margin:0;font-size:13px;color:var(--ink-2)}
+  .meth-card .badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:auto}
+  .badge{padding:3px 8px;border-radius:6px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.3px}
+  .b-icse{background:var(--aqua-light);color:var(--navy)}
+  .b-nep{background:#E8F4FD;color:#006CB4}
+  .b-bloom{background:#FFF4E0;color:#92400E}
+
+  .modal-bg{position:fixed;inset:0;background:rgba(15,42,74,.55);display:none;align-items:center;justify-content:center;z-index:200;padding:20px;backdrop-filter:blur(2px)}
+  .modal-bg.open{display:flex}
+  .modal{background:#fff;border-radius:16px;max-width:780px;width:100%;max-height:88vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:pop .2s ease}
+  @keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+  .modal-head{padding:20px 22px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;gap:14px;position:sticky;top:0;background:#fff;z-index:5}
+  .modal-head h3{margin:0 0 4px;font-size:20px;color:var(--navy)}
+  .modal-head .close{background:#f1f5f9;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:18px;color:var(--ink-2)}
+  .modal-body{padding:18px 22px 22px}
+  .modal-body h4{margin:14px 0 6px;font-size:14px;color:var(--navy);text-transform:uppercase;letter-spacing:.4px}
+  .modal-body ol, .modal-body ul{margin:6px 0 10px;padding-left:20px}
+  .modal-body p{margin:6px 0;font-size:14px;color:var(--ink-2)}
+
+  .builder{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:1000px){.builder{grid-template-columns:1fr}}
+  .form-grp{margin-bottom:14px}
+  .form-grp label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px}
+  .form-grp input, .form-grp select, .form-grp textarea{width:100%;padding:9px 11px;border:1.5px solid var(--line-2);border-radius:8px;font-size:14px;font-family:inherit;color:var(--ink);background:#fff;transition:border .15s, box-shadow .15s}
+  .form-grp input:focus, .form-grp select:focus, .form-grp textarea:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(84,192,204,.25)}
+  .form-grp textarea{resize:vertical;min-height:64px}
+  .row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .checkbox-grp{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+  .check-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border:1.5px solid var(--line-2);border-radius:999px;font-size:12.5px;font-weight:600;color:var(--ink-2);cursor:pointer;background:#fff;transition:all .12s;user-select:none}
+  .check-chip:hover{border-color:var(--teal);color:var(--teal)}
+  .check-chip input{display:none}
+  .check-chip.on{background:var(--teal);color:#fff;border-color:var(--teal)}
+
+  .preview{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+  .preview h3{margin:0 0 4px;font-size:18px;color:var(--navy)}
+  .pv-meta{font-size:13px;color:var(--muted);margin-bottom:12px}
+  .pv-grid{display:grid;grid-template-columns:140px 1fr;gap:8px 12px;font-size:13.5px}
+  .pv-grid div:nth-child(odd){font-weight:700;color:var(--ink-2)}
+  .pv-grid div:nth-child(even){color:var(--ink-2)}
+  .pv-block{margin-top:14px;padding-top:14px;border-top:1px dashed var(--line)}
+  .pv-block h5{margin:0 0 6px;font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.4px}
+  .pv-5e{margin-top:10px}
+  .pv-5e-item{background:#f8fafc;border-left:4px solid var(--teal);padding:10px 12px;border-radius:0 8px 8px 0;margin-bottom:8px}
+  .pv-5e-item b{display:block;font-size:13px;color:var(--navy);margin-bottom:3px}
+  .pv-5e-item span{font-size:13px;color:var(--ink-2)}
+
+  .btn{background:var(--navy);color:#fff;border:none;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:all .15s}
+  .btn:hover{background:var(--navy-2);transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,63,135,.25)}
+  .btn.ghost{background:transparent;color:var(--navy);border:1.5px solid var(--line-2)}
+  .btn.ghost:hover{background:var(--aqua-light)}
+  .btn.teal{background:var(--teal);color:#fff}
+  .btn.teal:hover{background:var(--teal-3)}
+  .btn-row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+
+  .verb-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px}
+  .verb-pill{padding:7px 12px;border-radius:999px;font-size:13px;font-weight:600;border:2px solid transparent;cursor:pointer;color:#fff}
+  .vp-b1{background:var(--b1)}
+  .vp-b2{background:var(--b2)}
+  .vp-b3{background:var(--b3);color:#1f2937}
+  .vp-b4{background:var(--b4)}
+  .vp-b5{background:var(--b5)}
+  .vp-b6{background:var(--b6)}
+  .verb-pill.muted{background:#e2e8f0;color:#475569}
+  .verb-pool{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;min-height:120px}
+  .obj-build{background:#EFF8FA;border:1px solid #BFE3E9;border-radius:10px;padding:14px;margin-top:14px;font-size:14px;color:#0B3D49}
+  .obj-build code{background:#fff;padding:3px 8px;border-radius:6px;border:1px dashed #54C0CC;font-family:'SF Mono',Menlo,monospace;font-size:13px;color:#003F87}
+
+  .quiz-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
+  .quiz-q{font-size:15px;color:var(--navy);font-weight:700;margin:0 0 12px}
+  .quiz-opts{display:grid;gap:8px}
+  .quiz-opt{padding:10px 14px;border:1.5px solid var(--line-2);border-radius:10px;background:#fff;cursor:pointer;font-size:13.5px;text-align:left;transition:all .12s}
+  .quiz-opt:hover{border-color:var(--teal);background:var(--aqua-light)}
+  .quiz-opt.right{background:#E0F4E6;border-color:#16A34A;color:#14532D;font-weight:600}
+  .quiz-opt.wrong{background:#FCE5E5;border-color:#DC2626;color:#7F1D1D}
+  .quiz-meta{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:8px}
+  .quiz-explain{margin-top:12px;padding:11px 13px;background:#fefce8;border:1px solid #fde68a;border-radius:8px;font-size:13.5px;color:#713f12;display:none}
+  .quiz-explain.on{display:block}
+  .progress{height:6px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-bottom:14px}
+  .progress > div{height:100%;background:var(--teal);transition:width .3s}
+
+  .cs-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:900px){.cs-grid{grid-template-columns:1fr}}
+  .cs-card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px}
+  .cs-card h4{margin:0 0 8px;font-size:14px;color:var(--navy);text-transform:uppercase;letter-spacing:.4px}
+  .cs-card ul{margin:0;padding-left:18px;font-size:13.5px;color:var(--ink-2)}
+  .cs-card ul li{margin-bottom:5px}
+  .cs-card.warn{border-left:4px solid var(--rose)}
+  .cs-card.good{border-left:4px solid var(--green)}
+  .cs-card.idea{border-left:4px solid var(--amber)}
+
+  footer{text-align:center;color:var(--muted);font-size:12.5px;padding:20px;border-top:3px solid var(--teal);background:#fff}
+  footer .foot-tag{display:inline-block;color:var(--navy);font-weight:700;letter-spacing:1.2px;text-transform:uppercase;font-size:11px;margin-bottom:4px}
+
+  @media print{
+    nav.tabs,header.top,footer,.btn,.btn-row{display:none !important}
+    section.panel{display:block !important;page-break-after:always}
+    main{padding:0}
+    .card,.preview,.quiz-card,.cs-card{box-shadow:none;border:1px solid #ccc}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="head-wrap">
+    <div class="head-row">
+      <div class="head-logo">
+        <img src="SCHOOL%20LOGO/The%20World%20School%20School%20ICSE%20Logo.png" alt="The World School ICSE" onerror="this.outerHTML='<div style=&quot;font-weight:900;font-size:30px;color:#003F87;font-family:Georgia,serif&quot;>K</div>'"/>
+      </div>
+      <div>
+        <div class="school-mark"><span class="dot"></span> Kolte Foundation's · The World School (ICSE) · Bhusawal</div>
+        <h1 class="title">Teaching Methodologies Dashboard</h1>
+        <div class="tagline">Ethics · Education · Excellence  |  Academic Planning 2026-27</div>
+      </div>
+    </div>
+    <p class="subtitle">A working tool for TWS teachers — explore Bloom's Taxonomy, NEP 2020, and modern pedagogies, then build a complete lesson plan in minutes. Click anything. Everything is interactive.</p>
+    <div class="hero-stats">
+      <div class="hero-stat"><b>6</b><span>Bloom's Levels</span></div>
+      <div class="hero-stat"><b>10</b><span>NEP Pillars</span></div>
+      <div class="hero-stat"><b>12</b><span>Methodologies</span></div>
+      <div class="hero-stat"><b>1</b><span>Lesson Builder</span></div>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="tabs-inner" id="tabsBar">
+    <button class="tab active" data-tab="home"><span class="tab-ico">🏠</span> Home</button>
+    <button class="tab" data-tab="bloom"><span class="tab-ico">🎯</span> Bloom's Taxonomy</button>
+    <button class="tab" data-tab="nep"><span class="tab-ico">🇮🇳</span> NEP 2020</button>
+    <button class="tab" data-tab="methods"><span class="tab-ico">🧠</span> Methodologies</button>
+    <button class="tab" data-tab="builder"><span class="tab-ico">🛠️</span> Lesson Builder</button>
+    <button class="tab" data-tab="verbs"><span class="tab-ico">📝</span> Objective Generator</button>
+    <button class="tab" data-tab="quiz"><span class="tab-ico">❓</span> Self-Assessment</button>
+    <button class="tab" data-tab="cheat"><span class="tab-ico">📋</span> Quick Reference</button>
+  </div>
+</nav>
+
+<main>
+
+<section class="panel active" id="panel-home">
+  <h2 class="section-title">Welcome — what would you like to do?</h2>
+  <p class="section-lead">This dashboard is built around how a TWS teacher actually plans a lesson: pick a learning level (Bloom's), align with a CISCE/NEP intent, choose a delivery methodology, then assemble it into a usable plan. Click a card below or use the tabs above.</p>
+
+  <div class="info-strip">
+    <b>How to use this dashboard:</b> Read theory in <b>Bloom's</b>, <b>NEP 2020</b>, and <b>Methodologies</b>. Then move to the <b>Lesson Builder</b> to draft a plan, use the <b>Objective Generator</b> to write SMART objectives with the right action verbs, and check your understanding in <b>Self-Assessment</b>. Print or download anytime.
+  </div>
+
+  <div class="grid g-4">
+    <div class="card home-card" onclick="goTab('bloom')"><div class="home-ico">🎯</div><h3>Bloom's Taxonomy</h3><p>Click any of the 6 levels to see verbs, sample questions and ICSE-context examples.</p></div>
+    <div class="card home-card" onclick="goTab('nep')"><div class="home-ico">🇮🇳</div><h3>NEP 2020</h3><p>5+3+3+4 structure, FLN, art-integrated, experiential and 8 more pedagogical pillars.</p></div>
+    <div class="card home-card" onclick="goTab('methods')"><div class="home-ico">🧠</div><h3>12 Methodologies</h3><p>5E Model, Inquiry-Based, PBL, Flipped, UDL, Multiple Intelligences, and more.</p></div>
+    <div class="card home-card" onclick="goTab('builder')"><div class="home-ico">🛠️</div><h3>Lesson Builder</h3><p>Fill the form on the left — your printable 5E lesson plan appears live on the right.</p></div>
+    <div class="card home-card" onclick="goTab('verbs')"><div class="home-ico">📝</div><h3>Objective Generator</h3><p>Filter Bloom-aligned verbs by level and click to compose SWBAT objectives instantly.</p></div>
+    <div class="card home-card" onclick="goTab('quiz')"><div class="home-ico">❓</div><h3>Self-Assessment</h3><p>10-question check on Bloom's, NEP, and methodologies with explanations.</p></div>
+    <div class="card home-card" onclick="goTab('cheat')"><div class="home-ico">📋</div><h3>Quick Reference</h3><p>Cheat-sheet of do's, don'ts, ICSE-CISCE alignment notes, and assessment ideas.</p></div>
+    <div class="card home-card" onclick="window.print()"><div class="home-ico">🖨️</div><h3>Print Everything</h3><p>Print or save the complete dashboard as a PDF for staff-room use.</p></div>
+  </div>
+</section>
+
+<section class="panel" id="panel-bloom">
+  <h2 class="section-title">Bloom's Taxonomy (Revised — Anderson & Krathwohl, 2001)</h2>
+  <p class="section-lead">Bloom's classifies learning into six cognitive levels — from <b>Remember</b> at the base to <b>Create</b> at the top. Use it to write learning objectives, frame questions, and design assessments that move students from low-order to higher-order thinking. <b>Click each level</b> to see verbs, question stems, and TWS examples.</p>
+
+  <div class="grid g-2">
+    <div class="card">
+      <h3 style="margin:0 0 14px;color:var(--navy);font-size:16px">The Pyramid (click a level)</h3>
+      <div class="bloom-pyramid" id="bloomPyramid">
+        <div class="bloom-row b1" data-level="1"><span><span class="lev">L1 ·</span> Remember</span><span>🧠</span></div>
+        <div class="bloom-row b2" data-level="2"><span><span class="lev">L2 ·</span> Understand</span><span>💡</span></div>
+        <div class="bloom-row b3" data-level="3"><span><span class="lev">L3 ·</span> Apply</span><span>⚙️</span></div>
+        <div class="bloom-row b4" data-level="4"><span><span class="lev">L4 ·</span> Analyze</span><span>🔍</span></div>
+        <div class="bloom-row b5" data-level="5"><span><span class="lev">L5 ·</span> Evaluate</span><span>⚖️</span></div>
+        <div class="bloom-row b6" data-level="6"><span><span class="lev">L6 ·</span> Create</span><span>🎨</span></div>
+      </div>
+      <div style="margin-top:12px;font-size:12.5px;color:var(--muted);text-align:center">Lower Order Thinking (LOTS) — bottom 3 · Higher Order Thinking (HOTS) — top 3</div>
+    </div>
+
+    <div id="bloomDetail" class="bloom-detail">
+      <h3>Click any level on the left to begin</h3>
+      <div class="bd-meta">Each level shows definition, action verbs, question stems, and a TWS-classroom example.</div>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <h3 style="margin:0 0 8px;color:var(--navy);font-size:16px">How to use Bloom's in your TWS lesson plan</h3>
+    <ol style="margin:0;padding-left:20px;color:var(--ink-2);font-size:14px">
+      <li>For each chapter, target <b>at least one HOTS objective</b> (Analyze / Evaluate / Create) — CISCE specimen papers reward this.</li>
+      <li>Spread the <b>question types in your worksheet</b> across levels: don't ask only "Define / List".</li>
+      <li>In the <b>Objective Generator</b> tab, build SWBAT statements using the level-appropriate verbs.</li>
+      <li>For Pre-Primary / Primary, lean on L1–L3 with concrete activities; for Middle / Senior, push L4–L6.</li>
+    </ol>
+  </div>
+</section>
+
+<section class="panel" id="panel-nep">
+  <h2 class="section-title">NEP 2020 — Pedagogical Framework</h2>
+  <p class="section-lead">India's National Education Policy 2020 reshapes <i>how</i> we teach, not just <i>what</i> we teach. The CISCE board has aligned its specimen papers and curriculum revisions to NEP. Here are the 10 pillars every TWS teacher should weave into lesson plans.</p>
+
+  <h3 style="margin:14px 0 6px;font-size:15px;color:var(--navy)">School Stages (5+3+3+4)</h3>
+  <div class="stage-bar">
+    <div class="stage s1"><b>Foundational</b><span>Ages 3–8 · Pre-Primary + Cl 1–2</span></div>
+    <div class="stage s2"><b>Preparatory</b><span>Ages 8–11 · Cl 3–5</span></div>
+    <div class="stage s3"><b>Middle</b><span>Ages 11–14 · Cl 6–8</span></div>
+    <div class="stage s4"><b>Secondary</b><span>Ages 14–18 · Cl 9–12</span></div>
+  </div>
+
+  <h3 style="margin:14px 0 10px;font-size:15px;color:var(--navy)">10 Pedagogical Pillars (click to expand)</h3>
+  <div class="nep-grid" id="nepGrid"></div>
+
+  <div class="card" style="margin-top:18px;border-left:4px solid var(--indigo)">
+    <h3 style="margin:0 0 8px;color:var(--navy);font-size:16px">NEP × CISCE Alignment Quick Notes</h3>
+    <ul style="margin:0;padding-left:20px;color:var(--ink-2);font-size:14px">
+      <li><b>FLN (Foundational Literacy & Numeracy):</b> Mandatory focus for Cl 1–3 — embed daily.</li>
+      <li><b>Art & Sport-integrated learning:</b> Use at least one integrated activity per unit.</li>
+      <li><b>Toy-based & Story-based pedagogy:</b> Pre-Primary to Cl 5 — anchor concepts in narrative or play.</li>
+      <li><b>Holistic Progress Card (HPC):</b> Reflect cognitive + socio-emotional + creative observations.</li>
+      <li><b>Multilingualism:</b> R3L (Reading the Three Languages) — Hindi / Marathi / English crosswalk where natural.</li>
+      <li><b>Competency-Based Assessment:</b> Move from rote-recall papers to scenario-based questions (CISCE has already shifted).</li>
+    </ul>
+  </div>
+</section>
+
+<section class="panel" id="panel-methods">
+  <h2 class="section-title">Teaching Methodologies — 12 Modern Approaches</h2>
+  <p class="section-lead">Different lessons need different engines. Click any methodology to see what it is, when to use it, the step-by-step process, a TWS classroom example, and how it aligns with Bloom's & NEP.</p>
+  <div class="grid g-3" id="methGrid"></div>
+</section>
+
+<section class="panel" id="panel-builder">
+  <h2 class="section-title">Interactive Lesson Plan Builder</h2>
+  <p class="section-lead">Fill the form on the left. The right panel updates live with a print-ready 5E lesson plan that includes Bloom's-aligned objectives, methodology selections, NEP tags, and reflection space.</p>
+
+  <div class="builder">
+    <div class="card">
+      <div class="row-2">
+        <div class="form-grp"><label>Grade / Class</label>
+          <select id="lpGrade">
+            <option>Nursery</option><option>LKG</option><option>UKG</option>
+            <option>Class 1</option><option>Class 2</option><option>Class 3</option><option>Class 4</option><option>Class 5</option>
+            <option>Class 6</option><option>Class 7</option><option>Class 8</option>
+            <option>Class 9</option><option>Class 10</option>
+          </select>
+        </div>
+        <div class="form-grp"><label>Subject</label>
+          <select id="lpSubject">
+            <option>English</option><option>Hindi</option><option>Marathi</option>
+            <option>Mathematics</option><option>EVS</option><option>Science</option>
+            <option>Physics</option><option>Chemistry</option><option>Biology</option>
+            <option>History &amp; Civics</option><option>Geography</option><option>Computer Studies</option>
+            <option>Art / Craft</option><option>Physical Education</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grp"><label>Chapter / Topic</label>
+        <input id="lpTopic" placeholder="e.g. Light — Reflection &amp; Refraction" />
+      </div>
+      <div class="row-2">
+        <div class="form-grp"><label>Duration</label>
+          <select id="lpDuration"><option>35 min</option><option>40 min</option><option>45 min</option><option>2 × 40 min</option></select>
+        </div>
+        <div class="form-grp"><label>Lesson Date</label>
+          <input id="lpDate" type="date" />
+        </div>
+      </div>
+
+      <div class="form-grp"><label>Bloom's Level (primary focus)</label>
+        <div class="checkbox-grp" id="bloomChips">
+          <label class="check-chip"><input type="checkbox" value="Remember"/>Remember</label>
+          <label class="check-chip"><input type="checkbox" value="Understand"/>Understand</label>
+          <label class="check-chip"><input type="checkbox" value="Apply"/>Apply</label>
+          <label class="check-chip"><input type="checkbox" value="Analyze"/>Analyze</label>
+          <label class="check-chip"><input type="checkbox" value="Evaluate"/>Evaluate</label>
+          <label class="check-chip"><input type="checkbox" value="Create"/>Create</label>
+        </div>
+      </div>
+
+      <div class="form-grp"><label>NEP 2020 Pillar(s) Tagged</label>
+        <div class="checkbox-grp" id="nepChips">
+          <label class="check-chip"><input type="checkbox" value="Experiential Learning"/>Experiential</label>
+          <label class="check-chip"><input type="checkbox" value="Art-Integrated"/>Art-Integrated</label>
+          <label class="check-chip"><input type="checkbox" value="Sport-Integrated"/>Sport-Integrated</label>
+          <label class="check-chip"><input type="checkbox" value="Story-Telling"/>Story-Telling</label>
+          <label class="check-chip"><input type="checkbox" value="Toy-Based"/>Toy-Based</label>
+          <label class="check-chip"><input type="checkbox" value="FLN Focus"/>FLN Focus</label>
+          <label class="check-chip"><input type="checkbox" value="Multilingual"/>Multilingual</label>
+          <label class="check-chip"><input type="checkbox" value="Competency-Based"/>Competency-Based</label>
+          <label class="check-chip"><input type="checkbox" value="21st Century Skills"/>21st-Century Skills</label>
+          <label class="check-chip"><input type="checkbox" value="Inclusive"/>Inclusive</label>
+        </div>
+      </div>
+
+      <div class="form-grp"><label>Primary Methodology</label>
+        <select id="lpMethod">
+          <option>5E Model (Engage–Explore–Explain–Elaborate–Evaluate)</option>
+          <option>Inquiry-Based Learning</option>
+          <option>Project-Based Learning (PBL)</option>
+          <option>Flipped Classroom</option>
+          <option>Differentiated Instruction</option>
+          <option>Universal Design for Learning (UDL)</option>
+          <option>Collaborative / Cooperative Learning</option>
+          <option>Socratic Method</option>
+          <option>Direct Instruction</option>
+          <option>Gamification</option>
+          <option>Experiential (Kolb's Cycle)</option>
+          <option>Constructivism (Vygotsky / Piaget)</option>
+        </select>
+      </div>
+
+      <div class="form-grp"><label>Learning Objectives (one per line — start with "SWBAT…")</label>
+        <textarea id="lpObjectives" rows="3" placeholder="SWBAT explain the laws of reflection.&#10;SWBAT construct a periscope using mirrors.&#10;SWBAT evaluate everyday uses of refraction."></textarea>
+      </div>
+
+      <div class="form-grp"><label>Materials / Resources</label>
+        <textarea id="lpMaterials" rows="2" placeholder="Mirrors, laser pointer, periscope kit, smartboard, NCERT/Selina textbook pp. 84-96"></textarea>
+      </div>
+
+      <h4 style="margin:18px 0 6px;font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.4px">5E Sequence</h4>
+      <div class="form-grp"><label>1. Engage (hook — 5 min)</label><textarea id="lp5E1" rows="2" placeholder="Show a 30-sec video of a magic disappearing-coin trick using water refraction. Ask: 'How did the coin vanish?'"></textarea></div>
+      <div class="form-grp"><label>2. Explore (hands-on — 10 min)</label><textarea id="lp5E2" rows="2" placeholder="Pairs experiment with mirror angles and a laser pointer. Record observation in worksheet."></textarea></div>
+      <div class="form-grp"><label>3. Explain (concept — 10 min)</label><textarea id="lp5E3" rows="2" placeholder="Teacher introduces laws of reflection with diagram on board; students label diagram in notebook."></textarea></div>
+      <div class="form-grp"><label>4. Elaborate (apply — 10 min)</label><textarea id="lp5E4" rows="2" placeholder="Each pair builds a working periscope; explains its use in submarines/security."></textarea></div>
+      <div class="form-grp"><label>5. Evaluate (assess — 5 min)</label><textarea id="lp5E5" rows="2" placeholder="Exit ticket: 3 MCQs + 1 HOTS — 'Why does a pencil look bent in a glass of water?'"></textarea></div>
+      <div class="form-grp"><label>Differentiation / Inclusion notes</label><textarea id="lpDiff" rows="2" placeholder="For struggling learners: pre-labelled diagrams. For advanced: research how rear-view mirrors use convex reflection."></textarea></div>
+      <div class="form-grp"><label>Homework / Extension</label><textarea id="lpHW" rows="2" placeholder="Write 3 examples of refraction observed at home + sketch."></textarea></div>
+
+      <div class="btn-row">
+        <button class="btn teal" onclick="renderPreview()">🔄 Refresh Preview</button>
+        <button class="btn" onclick="window.print()">🖨️ Print / Save PDF</button>
+        <button class="btn ghost" onclick="downloadJSON()">💾 Save as JSON</button>
+        <button class="btn ghost" onclick="loadDemo()">✨ Load Demo</button>
+      </div>
+    </div>
+
+    <div class="preview" id="lpPreview">
+      <h3 id="pvTitle">Lesson Plan Preview</h3>
+      <div class="pv-meta" id="pvMeta">Fill the form on the left to see it appear here.</div>
+      <div class="pv-grid" id="pvGrid"></div>
+      <div class="pv-block" id="pvObj"></div>
+      <div class="pv-block" id="pv5E"></div>
+      <div class="pv-block" id="pvDiff"></div>
+      <div class="pv-block" id="pvHW"></div>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="panel-verbs">
+  <h2 class="section-title">Learning Objective Generator</h2>
+  <p class="section-lead">Filter by Bloom's level, then click verbs to build a SMART objective. Every TWS lesson plan should open with 2–4 SWBAT statements that map to specific Bloom's levels.</p>
+
+  <div class="card">
+    <div class="verb-controls">
+      <span style="font-size:13px;color:var(--ink-2);font-weight:700">Show verbs from:</span>
+      <button class="verb-pill vp-b1" data-vlvl="1">L1 Remember</button>
+      <button class="verb-pill vp-b2" data-vlvl="2">L2 Understand</button>
+      <button class="verb-pill vp-b3" data-vlvl="3">L3 Apply</button>
+      <button class="verb-pill vp-b4" data-vlvl="4">L4 Analyze</button>
+      <button class="verb-pill vp-b5" data-vlvl="5">L5 Evaluate</button>
+      <button class="verb-pill vp-b6" data-vlvl="6">L6 Create</button>
+      <button class="verb-pill muted" data-vlvl="all">Show All</button>
+    </div>
+
+    <div class="verb-pool" id="verbPool"></div>
+
+    <div class="obj-build">
+      <b>Compose your objective:</b><br>
+      <span style="font-size:13px">SWBAT (Students Will Be Able To) <code id="builtVerb">…click a verb above</code> <input id="objContext" placeholder="...the topic / context" style="border:1px dashed #86efac;background:#fff;padding:4px 8px;border-radius:6px;font-size:13px;width:280px;margin-left:6px"/></span>
+      <div style="margin-top:10px;font-size:13px;color:#166534">
+        <b>Live preview:</b> <span id="objPreview" style="background:#fff;padding:4px 10px;border-radius:6px;border:1px solid #bbf7d0">SWBAT … …</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn teal" onclick="copyObj()">📋 Copy Objective</button>
+        <button class="btn ghost" onclick="resetObj()">↺ Reset</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="panel-quiz">
+  <h2 class="section-title">Self-Assessment for Teachers</h2>
+  <p class="section-lead">10 quick questions to check your grip on Bloom's, NEP 2020, and methodologies. Each answer comes with an explanation. Be honest — score &lt; 7 means a refresher, score 7–9 is solid, 10 is mastery.</p>
+
+  <div class="card quiz-card" id="quizCard">
+    <div class="progress"><div id="qProg" style="width:10%"></div></div>
+    <div class="quiz-meta">
+      <span id="qIdx">Question 1 of 10</span>
+      <span id="qScore">Score: 0</span>
+    </div>
+    <p class="quiz-q" id="qText"></p>
+    <div class="quiz-opts" id="qOpts"></div>
+    <div class="quiz-explain" id="qExp"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="qPrev" onclick="qPrev()">← Previous</button>
+      <button class="btn teal" id="qNext" onclick="qNext()">Next →</button>
+      <button class="btn ghost" onclick="qReset()">↺ Restart</button>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="panel-cheat">
+  <h2 class="section-title">Quick Reference — Cheat Sheet for the Staff Room</h2>
+  <p class="section-lead">Pin this. Print this. Use it during planning periods.</p>
+
+  <div class="cs-grid">
+    <div class="cs-card good">
+      <h4>✓ Do — Lesson Plan Essentials</h4>
+      <ul>
+        <li>Open with a <b>hook</b> in the first 90 seconds (story, image, question).</li>
+        <li>Write <b>2–4 SWBAT objectives</b> mapped to Bloom's levels — at least one HOTS.</li>
+        <li>Plan for <b>"I do → We do → You do"</b> shifts of responsibility.</li>
+        <li>Build in a <b>5-minute Evaluate / exit ticket</b> — no lesson without assessment.</li>
+        <li>Tag at least <b>one NEP pillar</b> (Art / Sport / Story / Experiential).</li>
+        <li>Prepare a <b>differentiation plan</b> for 1 struggling + 1 advanced learner.</li>
+      </ul>
+    </div>
+    <div class="cs-card warn">
+      <h4>✗ Don't — Common Pitfalls</h4>
+      <ul>
+        <li>Don't write objectives starting with "Teach" or "Discuss" — those are <b>activities</b>, not learning outcomes.</li>
+        <li>Don't ask only Remember/Understand questions in your worksheet.</li>
+        <li>Don't end the period without an exit-ticket, oral check, or observation.</li>
+        <li>Don't use 5E for every lesson — it suits inquiry-driven topics best.</li>
+        <li>Don't tick NEP pillars that the lesson doesn't actually demonstrate.</li>
+        <li>Don't ignore the <b>Holistic Progress Card</b> — capture observations weekly.</li>
+      </ul>
+    </div>
+
+    <div class="cs-card idea">
+      <h4>💡 Bloom's Verb Picks (most-used at TWS)</h4>
+      <ul>
+        <li><b>Remember:</b> list, label, name, recall, identify, define</li>
+        <li><b>Understand:</b> explain, summarise, classify, infer, compare</li>
+        <li><b>Apply:</b> demonstrate, solve, use, illustrate, calculate</li>
+        <li><b>Analyze:</b> differentiate, examine, organise, attribute, deconstruct</li>
+        <li><b>Evaluate:</b> judge, critique, justify, defend, prioritise</li>
+        <li><b>Create:</b> design, compose, construct, plan, devise, invent</li>
+      </ul>
+    </div>
+    <div class="cs-card idea">
+      <h4>💡 Assessment Variety (mix at least 3 per unit)</h4>
+      <ul>
+        <li><b>Diagnostic:</b> KWL chart, pre-test, concept map</li>
+        <li><b>Formative:</b> exit ticket, thumbs up/down, mini-whiteboard, peer check</li>
+        <li><b>Performance:</b> demo, presentation, lab, role-play</li>
+        <li><b>Project:</b> model, poster, journal, podcast, mini-research</li>
+        <li><b>Summative:</b> chapter test, term exam, portfolio</li>
+        <li><b>Self/Peer:</b> rubric self-grade, gallery walk feedback</li>
+      </ul>
+    </div>
+
+    <div class="cs-card good">
+      <h4>✓ NEP-CISCE Quick Wins per Stage</h4>
+      <ul>
+        <li><b>Foundational (Pre-Pri – Cl 2):</b> Toy-based, story-based, free-play, ECCE blocks, FLN every period.</li>
+        <li><b>Preparatory (Cl 3–5):</b> Art-integrated, simple experiments, vocabulary-rich talk, 3-language exposure.</li>
+        <li><b>Middle (Cl 6–8):</b> Inquiry-Based, projects, coding, vocational exposure (10-day bagless).</li>
+        <li><b>Secondary (Cl 9–10):</b> Competency-based MCQs, Socratic seminars, board-style HOTS.</li>
+      </ul>
+    </div>
+    <div class="cs-card warn">
+      <h4>⚠️ ICSE / CISCE Specific Reminders</h4>
+      <ul>
+        <li>Specimen papers (2025+) carry <b>30–40% scenario-based questions</b> — train students on stems like "explain why", "justify with reason".</li>
+        <li><b>Internal Assessment</b> is now <b>20%</b> in many subjects — design rubrics in advance.</li>
+        <li>Maintain a <b>Resource Folder per chapter</b>: lesson plan + worksheet + assessment + reflection.</li>
+        <li>Honour the <b>CISCE-prescribed text + at least one supplementary</b> reference per chapter.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card" style="margin-top:18px;border-top:4px solid var(--teal)">
+    <h3 style="margin:0 0 8px;color:var(--navy);font-size:16px">Recommended Weekly Planning Rhythm at TWS</h3>
+    <ol style="margin:0;padding-left:20px;color:var(--ink-2);font-size:14px">
+      <li><b>Mon morning:</b> Plan all 5 lessons of the week using this dashboard (15 min × 5).</li>
+      <li><b>Daily after class:</b> Spend 3 min in the "Reflection" box of your printed lesson plan — what worked, what didn't.</li>
+      <li><b>Fri afternoon:</b> Review the week's exit tickets to spot 2 students needing intervention.</li>
+      <li><b>Sat coordination:</b> Bring 1 printed lesson plan to the subject-coordinator meeting for peer review.</li>
+    </ol>
+  </div>
+</section>
+
+</main>
+
+<div class="modal-bg" id="modalBg" onclick="if(event.target.id==='modalBg')closeModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3 id="modalTitle">Title</h3>
+        <div id="modalSub" style="font-size:12.5px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px"></div>
+      </div>
+      <button class="close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<footer>
+  <div class="foot-tag">Ethics · Education · Excellence</div><br>
+  © 2026 Kolte Foundation's <b style="color:var(--navy)">The World School (ICSE)</b>, Bhusawal · ICSE Affiliation MA234 · Built for Academic Planning 2026-27
+</footer>
+
+<script>
+const tabs = document.querySelectorAll('.tab');
+const panels = document.querySelectorAll('.panel');
+function goTab(name){
+  tabs.forEach(t=>t.classList.toggle('active',t.dataset.tab===name));
+  panels.forEach(p=>p.classList.toggle('active',p.id==='panel-'+name));
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+tabs.forEach(t=>t.addEventListener('click',()=>goTab(t.dataset.tab)));
+
+const bloom = {
+  1:{name:'Remember',color:'var(--b1)',def:'Recall facts, terms, basic concepts and answers. The foundation of all higher thinking — you cannot analyse what you cannot first remember.',
+     verbs:['list','define','label','name','recall','identify','memorise','recognise','state','quote','match','select'],
+     stems:['What is …?','Define the term …','List the steps of …','Who/where/when …?','Match column A with column B.','Recall the formula for …'],
+     icse:'<b>Class 6 EVS:</b> "List the layers of the atmosphere in order." / <b>Class 9 Geography:</b> "Name the major rivers of peninsular India."'
+  },
+  2:{name:'Understand',color:'var(--b2)',def:'Explain ideas, interpret meaning, summarise, infer, compare. Student demonstrates understanding in their own words.',
+     verbs:['explain','summarise','classify','compare','contrast','infer','interpret','paraphrase','illustrate','describe','outline','translate'],
+     stems:['Explain in your own words …','Summarise the main idea of …','Compare … with …','Why does … happen?','What can you infer from …?'],
+     icse:'<b>Class 5 English:</b> "Summarise the poem in 3 lines." / <b>Class 8 History:</b> "Compare the causes of the French Revolution with the Russian Revolution."'
+  },
+  3:{name:'Apply',color:'var(--b3)',def:'Use information, methods or rules in a new situation. Move from theory to practice.',
+     verbs:['solve','use','demonstrate','illustrate','calculate','operate','implement','execute','sketch','dramatise','perform'],
+     stems:['Solve …','Use the formula to …','How would you use … in real life?','Demonstrate how to …','Calculate the value of …'],
+     icse:'<b>Class 7 Maths:</b> "Apply Pythagoras\' theorem to find the height of a building." / <b>Class 10 Chemistry:</b> "Use the reactivity series to predict the products of …"'
+  },
+  4:{name:'Analyze',color:'var(--b4)',def:'Break information into parts, examine relationships, find patterns, and identify motives or causes.',
+     verbs:['differentiate','examine','organise','attribute','distinguish','compare','contrast','investigate','categorise','deconstruct','dissect'],
+     stems:['What are the key parts of …?','How does … relate to …?','What evidence supports …?','Categorise the following into …','Distinguish between … and …'],
+     icse:'<b>Class 9 Biology:</b> "Differentiate between mitosis and meiosis with a labelled diagram." / <b>Class 8 Civics:</b> "Analyse why the Indian Constitution adopted a parliamentary form."'
+  },
+  5:{name:'Evaluate',color:'var(--b5)',def:'Make judgements based on criteria. Defend opinions with evidence. Critique, justify, prioritise.',
+     verbs:['judge','critique','justify','defend','prioritise','argue','recommend','support','rate','assess','appraise','validate'],
+     stems:['Justify why …','Critique the author\'s argument that …','Which is more important — … or …? Why?','Defend your stance on …','Recommend a solution for … and explain.'],
+     icse:'<b>Class 10 English Literature:</b> "Justify whether Brutus is a tragic hero. Support with text evidence." / <b>Class 9 EVS:</b> "Evaluate which renewable energy is best for rural Maharashtra."'
+  },
+  6:{name:'Create',color:'var(--b6)',def:'Combine elements to make something original — a plan, product, theory, or piece of art. The highest level of thinking.',
+     verbs:['design','compose','construct','plan','devise','invent','generate','formulate','assemble','produce','originate','script'],
+     stems:['Design a … for …','Compose a poem / song about …','Construct a model of …','Invent a new way to …','Plan an experiment to test …','Script a skit on …'],
+     icse:'<b>Class 4 Art-Integrated:</b> "Compose a 4-line rhyme using prepositions." / <b>Class 9 Computer:</b> "Design a flowchart for online attendance marking."'
+  }
+};
+
+const detail = document.getElementById('bloomDetail');
+function renderBloom(level){
+  const b = bloom[level];
+  detail.style.borderTopColor = b.color;
+  detail.innerHTML = `
+    <h3 style="color:${b.color}">L${level} · ${b.name}</h3>
+    <div class="bd-meta">${b.def}</div>
+    <div class="bd-grid">
+      <div class="bd-block">
+        <h4>🎯 Action Verbs</h4>
+        <div class="verb-chip-row">${b.verbs.map(v=>`<span class="verb-chip">${v}</span>`).join('')}</div>
+      </div>
+      <div class="bd-block">
+        <h4>❓ Question Stems</h4>
+        <ul class="stem-list">${b.stems.map(s=>`<li>${s}</li>`).join('')}</ul>
+      </div>
+    </div>
+    <div class="icse-example"><b>TWS / ICSE example:</b><br>${b.icse}</div>
+    <div style="margin-top:12px"><button class="btn ghost" onclick="goTab('verbs')">→ Use these verbs in the Objective Generator</button></div>
+  `;
+}
+document.querySelectorAll('.bloom-row').forEach(r=>{
+  r.addEventListener('click',()=>renderBloom(r.dataset.level));
+});
+renderBloom(3);
+
+const nepPillars = [
+  {tag:'Pillar 1', title:'Foundational Literacy & Numeracy (FLN)', short:'NIPUN-Bharat-aligned reading, writing & math by end of Class 3.',
+   long:'<p>FLN is non-negotiable. Every Pre-Pri to Cl 3 lesson should explicitly build vocabulary, decoding, fluency, or number sense.</p><h4>Classroom action</h4><ul><li>10-min daily phonics block</li><li>Maths talk routine — number of the day</li><li>Read-aloud daily</li><li>Bilingual word walls</li></ul>'},
+  {tag:'Pillar 2', title:'Experiential Learning', short:'Learning by doing — hands-on, story-driven, sport-integrated.',
+   long:'<p>Move beyond chalk-and-talk. Pair every concept with an activity, demo, or real-world connect.</p><h4>Examples</h4><ul><li>Maths: shop role-play for fractions</li><li>Science: kitchen-chemistry for acid-base</li><li>History: dramatise Salt March</li></ul>'},
+  {tag:'Pillar 3', title:'Art-Integrated Learning', short:'Use drawing, music, drama as vehicles to teach any subject.',
+   long:'<p>Art is a method, not just a subject. CISCE encourages art-integration in mainstream periods.</p><h4>Examples</h4><ul><li>Draw the water cycle as a comic strip</li><li>Sing tables to a Bollywood beat</li><li>Mime parts of speech</li></ul>'},
+  {tag:'Pillar 4', title:'Sport-Integrated Learning', short:'Movement-based concept teaching, especially Cl 1–8.',
+   long:'<p>Use the playground as a classroom — measure track for length, run relays for fractions of distance, design simple games to teach probability.</p>'},
+  {tag:'Pillar 5', title:'Story-Telling Pedagogy', short:'Anchor every concept in a narrative — even Maths and Science.',
+   long:'<p>Stories activate memory and emotion. For Pre-Pri to Cl 5, no lesson should open without a 60-second story or scenario.</p><h4>Sources</h4><ul><li>Panchatantra / Jataka Tales</li><li>Local folk tales (Khandeshi, Marathi)</li><li>StoryWeaver (Pratham Books)</li></ul>'},
+  {tag:'Pillar 6', title:'Toy-Based / Play-Based Pedagogy', short:'Pre-Primary & Primary — learn through manipulatives, blocks, puzzles.',
+   long:'<p>Indigenous toys, low-cost materials, locally-sourced manipulatives — core to NEP\'s ECCE.</p><h4>Toolkit</h4><ul><li>Number rods, 10-frames, abacus</li><li>Blocks, plastic coins, picture cards</li><li>Channapatna toys, kabaadi-jugaad models</li></ul>'},
+  {tag:'Pillar 7', title:'Multilingualism (Three-Language Formula)', short:'Mother tongue + Hindi + English wherever natural.',
+   long:'<p>Use the home language to scaffold a tough concept, then bridge to English. R3L = Reading the Three Languages.</p>'},
+  {tag:'Pillar 8', title:'Competency-Based Assessment', short:'Move from rote-recall to scenario, application, HOTS.',
+   long:'<p>CISCE specimen papers carry 30-40% case-based, scenario, HOTS questions. Train students with NCERT exemplars + CISCE specimen archive.</p><h4>Question stems to favour</h4><ul><li>"Examine the situation and decide…"</li><li>"Justify the choice with reason"</li><li>"Predict and explain"</li></ul>'},
+  {tag:'Pillar 9', title:'21st-Century Skills (4Cs + DLC)', short:'Critical Thinking, Creativity, Collaboration, Communication + Digital, Life skills.',
+   long:'<p>Embed at least one 4C in every lesson. Tag it on the lesson plan.</p><h4>Quick activities</h4><ul><li>Think-Pair-Share for collab</li><li>Flowchart for critical thinking</li><li>Pitch-in-60-sec for communication</li></ul>'},
+  {tag:'Pillar 10', title:'Inclusive Education & UDL', short:'Plan for diverse learners — pace, modality, ability, language.',
+   long:'<p>Every lesson must have a "stretch" task and a "support" task. Use multiple representations (visual + verbal + kinesthetic).</p>'},
+];
+const nepGrid = document.getElementById('nepGrid');
+nepPillars.forEach((p)=>{
+  const el = document.createElement('div');
+  el.className = 'nep-pillar';
+  el.innerHTML = `<div class="nep-tag">${p.tag}</div><h4>${p.title}</h4><p>${p.short}</p>`;
+  el.addEventListener('click',()=>openModal(p.title,p.tag,p.long));
+  nepGrid.appendChild(el);
+});
+
+const methods = [
+  {ico:'🔄',title:'5E Model',by:'Bybee / BSCS',desc:'Engage → Explore → Explain → Elaborate → Evaluate. The gold standard for inquiry science & maths lessons.',
+   tags:['NEP','Bloom'],
+   long:'<h4>When to use</h4><p>Concept-heavy science, math, social-studies lessons where discovery is possible.</p><h4>Steps</h4><ol><li><b>Engage</b> — hook (60-90 sec).</li><li><b>Explore</b> — students investigate before being taught.</li><li><b>Explain</b> — teacher consolidates with vocabulary & diagram.</li><li><b>Elaborate</b> — apply to a new situation.</li><li><b>Evaluate</b> — formative check.</li></ol><h4>TWS example</h4><p>Class 7 Science — "Heat Transfer": ice cube vs metal spoon → predict-explain → conduction-convection-radiation → design a solar cooker → 3-MCQ exit ticket.</p><h4>Aligns with</h4><p>NEP Experiential, Bloom L3-L6.</p>'},
+  {ico:'🔍',title:'Inquiry-Based Learning',by:'Dewey / Bruner',desc:'Start with a driving question; students investigate, debate, and reach conclusions.',
+   tags:['NEP','Bloom'],
+   long:'<h4>When to use</h4><p>Open-ended topics where multiple answers exist (history, civics, environment).</p><h4>Steps</h4><ol><li>Pose a driving question.</li><li>Students hypothesise.</li><li>Investigate via texts, experiments, surveys.</li><li>Synthesise findings.</li><li>Reflect & re-question.</li></ol><h4>TWS example</h4><p>Class 8 Civics — "Should voting age be lowered to 16?" — research, debate, write op-ed.</p>'},
+  {ico:'📦',title:'Project-Based Learning (PBL)',by:'Buck Institute',desc:'Sustained projects (1–6 weeks) ending in a public product or presentation.',
+   tags:['NEP','Bloom'],
+   long:'<h4>When to use</h4><p>Once per term per subject. Anchors multiple chapters into one big experience.</p><h4>Steps</h4><ol><li>Driving question.</li><li>Need-to-know list.</li><li>Research + drafting.</li><li>Critique & revise.</li><li>Public showcase.</li></ol><h4>TWS example</h4><p>Class 5 EVS — "Water Audit of TWS Campus": measure usage, propose savings, present to Director.</p>'},
+  {ico:'🔁',title:'Flipped Classroom',by:'Bergmann & Sams',desc:'Lecture moves home (video), classroom becomes practice & doubt-solving.',
+   tags:['NEP'],
+   long:'<h4>When to use</h4><p>Repetitive concept-heavy topics (Math procedures, Grammar rules) — Cl 6 onwards.</p><h4>Steps</h4><ol><li>Share 6-8 min video / reading the night before.</li><li>Students arrive having watched.</li><li>Class time used for problems, peer-teaching, doubts.</li></ol><h4>Caveat</h4><p>Needs reliable home internet — survey first.</p>'},
+  {ico:'🎯',title:'Differentiated Instruction',by:'Carol Tomlinson',desc:'Vary content / process / product / environment by readiness, interest, and learner profile.',
+   tags:['NEP'],
+   long:'<h4>4 elements to differentiate</h4><ul><li><b>Content</b> — what they learn (use tiered texts).</li><li><b>Process</b> — how they learn (visual / auditory / kinesthetic).</li><li><b>Product</b> — how they show it (write / draw / build / present).</li><li><b>Environment</b> — where & with whom they work.</li></ul>'},
+  {ico:'🧩',title:'Universal Design for Learning (UDL)',by:'CAST',desc:'Plan for variability from the start — multiple means of engagement, representation, expression.',
+   tags:['NEP'],
+   long:'<h4>3 UDL principles</h4><ol><li><b>Engagement</b> — multiple ways to motivate (the WHY).</li><li><b>Representation</b> — multiple ways to present info (the WHAT).</li><li><b>Action & Expression</b> — multiple ways to demonstrate (the HOW).</li></ol><h4>Quick wins</h4><ul><li>Always pair text with image</li><li>Always pair text with audio for FLN</li><li>Always offer choice in product type</li></ul>'},
+  {ico:'🤝',title:'Collaborative / Cooperative Learning',by:'Johnson & Johnson',desc:'Structured group work with positive interdependence and individual accountability.',
+   tags:['NEP'],
+   long:'<h4>Key structures</h4><ul><li><b>Think-Pair-Share</b></li><li><b>Jigsaw</b> — each student becomes expert on one part</li><li><b>Numbered Heads Together</b></li><li><b>Round Robin</b></li></ul><h4>Watch out for</h4><p>"Free riders" — assign roles & individual accountability.</p>'},
+  {ico:'💬',title:'Socratic Method',by:'Socrates / Paideia',desc:'Teach via probing questions. No direct answers — guide students to discover.',
+   tags:['Bloom'],
+   long:'<h4>When to use</h4><p>Literature, civics, philosophy, ethics — Class 7 onwards.</p><h4>Steps</h4><ol><li>Pose an open question.</li><li>Listen, then probe with "Why?", "How do you know?", "What if…?"</li><li>Help student see contradictions in their reasoning.</li><li>Reach refined understanding.</li></ol><h4>TWS example</h4><p>Class 9 English — "Was Antonio justified in his treatment of Shylock?" — full Socratic seminar in circle.</p>'},
+  {ico:'📐',title:'Direct Instruction',by:'Engelmann',desc:'Teacher-led, highly structured, scripted explanation followed by guided practice.',
+   tags:[],
+   long:'<h4>When to use</h4><p>New algorithms, decoding rules, safety procedures — anything where exploration would waste time or cause errors.</p><h4>Steps (I do → We do → You do)</h4><ol><li>Model with think-aloud.</li><li>Guided practice with immediate feedback.</li><li>Independent practice with check.</li></ol>'},
+  {ico:'🎮',title:'Gamification',by:'Various',desc:'Use game mechanics — points, levels, badges, quests — to drive engagement.',
+   tags:['NEP'],
+   long:'<h4>Quick formats</h4><ul><li>Kahoot / Quizizz quizzes</li><li>Class XP / leaderboards</li><li>Boss-fight units</li><li>Escape-room reviews</li></ul><h4>Caveat</h4><p>Design for collaboration leaderboards too — not just individual.</p>'},
+  {ico:'🌱',title:'Experiential (Kolb\'s Cycle)',by:'David Kolb',desc:'Concrete Experience → Reflective Observation → Abstract Conceptualisation → Active Experimentation.',
+   tags:['NEP','Bloom'],
+   long:'<h4>The cycle</h4><ol><li>Have an experience.</li><li>Reflect on it.</li><li>Form a theory / concept.</li><li>Test the theory in a new situation.</li></ol><h4>TWS example</h4><p>Class 6 — composting in a corner of the campus → reflect → theory of decomposition → predict best compost ratios.</p>'},
+  {ico:'🏗️',title:'Constructivism',by:'Piaget / Vygotsky',desc:'Learners build knowledge by connecting new info with prior schema. Teacher = facilitator.',
+   tags:['Bloom'],
+   long:'<h4>Two key ideas</h4><ul><li><b>Piaget:</b> learners need cognitive disequilibrium then accommodation.</li><li><b>Vygotsky:</b> learning happens in the Zone of Proximal Development with scaffolding (often peer or teacher).</li></ul><h4>Practice</h4><ul><li>Always activate prior knowledge first (KWL).</li><li>Scaffold — then fade the support.</li><li>Encourage productive struggle.</li></ul>'},
+];
+const methGrid = document.getElementById('methGrid');
+methods.forEach(m=>{
+  const el = document.createElement('div');
+  el.className = 'meth-card';
+  const badges = m.tags.map(t=>{
+    if(t==='NEP') return '<span class="badge b-nep">NEP-aligned</span>';
+    if(t==='Bloom') return '<span class="badge b-bloom">Bloom HOTS</span>';
+    if(t==='ICSE') return '<span class="badge b-icse">ICSE-fit</span>';
+  }).join('');
+  el.innerHTML = `<div class="meth-head"><div class="meth-ico">${m.ico}</div><div><div class="meth-by">${m.by}</div><h4>${m.title}</h4></div></div><p>${m.desc}</p><div class="badges">${badges}</div>`;
+  el.addEventListener('click',()=>openModal(m.title,m.by,m.long));
+  methGrid.appendChild(el);
+});
+
+const modalBg = document.getElementById('modalBg');
+function openModal(title,sub,html){
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalSub').textContent = sub;
+  document.getElementById('modalBody').innerHTML = html;
+  modalBg.classList.add('open');
+}
+function closeModal(){modalBg.classList.remove('open')}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal()});
+
+function getChips(id){
+  return Array.from(document.querySelectorAll(`#${id} .check-chip.on input`)).map(i=>i.value);
+}
+document.querySelectorAll('.check-chip').forEach(c=>{
+  c.addEventListener('click',e=>{
+    e.preventDefault();
+    const inp=c.querySelector('input');
+    inp.checked=!inp.checked;
+    c.classList.toggle('on',inp.checked);
+    renderPreview();
+  });
+});
+['lpGrade','lpSubject','lpTopic','lpDuration','lpDate','lpMethod','lpObjectives','lpMaterials','lp5E1','lp5E2','lp5E3','lp5E4','lp5E5','lpDiff','lpHW']
+  .forEach(id=>{const e=document.getElementById(id);if(e)e.addEventListener('input',renderPreview)});
+
+function renderPreview(){
+  const g=document.getElementById('lpGrade').value;
+  const s=document.getElementById('lpSubject').value;
+  const t=document.getElementById('lpTopic').value || '<i style="color:var(--muted)">[topic]</i>';
+  const d=document.getElementById('lpDuration').value;
+  const date=document.getElementById('lpDate').value || 'TBD';
+  const m=document.getElementById('lpMethod').value;
+  const blooms=getChips('bloomChips');
+  const neps=getChips('nepChips');
+  const obj=document.getElementById('lpObjectives').value;
+  const mats=document.getElementById('lpMaterials').value;
+  const e1=document.getElementById('lp5E1').value;
+  const e2=document.getElementById('lp5E2').value;
+  const e3=document.getElementById('lp5E3').value;
+  const e4=document.getElementById('lp5E4').value;
+  const e5=document.getElementById('lp5E5').value;
+  const diff=document.getElementById('lpDiff').value;
+  const hw=document.getElementById('lpHW').value;
+
+  document.getElementById('pvTitle').innerHTML = `${s} — ${t}`;
+  document.getElementById('pvMeta').textContent = `${g} · ${d} · ${date}`;
+
+  document.getElementById('pvGrid').innerHTML = `
+    <div>Methodology</div><div>${m}</div>
+    <div>Bloom's Levels</div><div>${blooms.length?blooms.join(', '):'<i style="color:var(--muted)">— select above —</i>'}</div>
+    <div>NEP Pillars</div><div>${neps.length?neps.join(', '):'<i style="color:var(--muted)">— select above —</i>'}</div>
+    <div>Materials</div><div>${mats||'<i style="color:var(--muted)">—</i>'}</div>
+  `;
+  document.getElementById('pvObj').innerHTML = `<h5>Learning Objectives</h5>${obj ? '<ul style="margin:6px 0;padding-left:20px;font-size:13.5px;color:var(--ink-2)">'+obj.split('\n').filter(x=>x.trim()).map(x=>'<li>'+x+'</li>').join('')+'</ul>' : '<p style="color:var(--muted);font-size:13px">No objectives entered yet.</p>'}`;
+  document.getElementById('pv5E').innerHTML = `<h5>5E Sequence</h5><div class="pv-5e">${block5E('1. Engage',e1)}${block5E('2. Explore',e2)}${block5E('3. Explain',e3)}${block5E('4. Elaborate',e4)}${block5E('5. Evaluate',e5)}</div>`;
+  document.getElementById('pvDiff').innerHTML = `<h5>Differentiation / Inclusion</h5><p style="font-size:13.5px;color:var(--ink-2);margin:0">${diff||'<i style="color:var(--muted)">—</i>'}</p>`;
+  document.getElementById('pvHW').innerHTML = `<h5>Homework / Extension</h5><p style="font-size:13.5px;color:var(--ink-2);margin:0">${hw||'<i style="color:var(--muted)">—</i>'}</p><div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--line);font-size:11px;color:var(--muted);text-align:center">Generated by TWS Teaching Methodologies Dashboard · ${new Date().toLocaleDateString('en-IN')}</div>`;
+}
+function block5E(label,text){
+  return `<div class="pv-5e-item"><b>${label}</b><span>${text||'<i style="color:var(--muted)">—</i>'}</span></div>`;
+}
+function loadDemo(){
+  document.getElementById('lpGrade').value='Class 7';
+  document.getElementById('lpSubject').value='Science';
+  document.getElementById('lpTopic').value='Heat Transfer — Conduction, Convection, Radiation';
+  document.getElementById('lpDuration').value='40 min';
+  document.getElementById('lpDate').value=new Date().toISOString().slice(0,10);
+  document.getElementById('lpMethod').value='5E Model (Engage–Explore–Explain–Elaborate–Evaluate)';
+  document.getElementById('lpObjectives').value='SWBAT differentiate between conduction, convection and radiation with diagrams.\nSWBAT design a simple solar cooker using everyday materials.\nSWBAT evaluate which method of heat transfer is dominant in given real-life scenarios.';
+  document.getElementById('lpMaterials').value='Metal spoon, ice cube, hot water, candle, thermocol box, foil, glass sheet, Selina Concise textbook pp. 120-128.';
+  document.getElementById('lp5E1').value='Place an ice cube on a metal spoon and a wooden spoon. Ask students to predict & explain which melts faster.';
+  document.getElementById('lp5E2').value='In pairs, students record temperature changes when a candle is held below water in a beaker.';
+  document.getElementById('lp5E3').value='Teacher introduces the 3 modes with labelled diagrams; students copy with examples.';
+  document.getElementById('lp5E4').value='Each pair designs a solar cooker prototype and explains heat-transfer mode used.';
+  document.getElementById('lp5E5').value='Exit ticket: 3 MCQs + HOTS — "Why are cooking pots black on the bottom?"';
+  document.getElementById('lpDiff').value='Support: pre-labelled diagrams + bilingual glossary. Stretch: research how a thermos flask uses all three modes.';
+  document.getElementById('lpHW').value='Sketch and label one example each of conduction, convection, and radiation observed at home.';
+  ['Understand','Apply','Create'].forEach(v=>toggleChip('bloomChips',v,true));
+  ['Experiential Learning','Competency-Based','21st Century Skills'].forEach(v=>toggleChip('nepChips',v,true));
+  renderPreview();
+}
+function toggleChip(group,val,on){
+  const inp=document.querySelector(`#${group} input[value="${val}"]`);
+  if(!inp)return;
+  inp.checked=on;
+  inp.parentElement.classList.toggle('on',on);
+}
+function downloadJSON(){
+  const data={
+    grade:document.getElementById('lpGrade').value,
+    subject:document.getElementById('lpSubject').value,
+    topic:document.getElementById('lpTopic').value,
+    duration:document.getElementById('lpDuration').value,
+    date:document.getElementById('lpDate').value,
+    method:document.getElementById('lpMethod').value,
+    bloom:getChips('bloomChips'),
+    nep:getChips('nepChips'),
+    objectives:document.getElementById('lpObjectives').value,
+    materials:document.getElementById('lpMaterials').value,
+    engage:document.getElementById('lp5E1').value,
+    explore:document.getElementById('lp5E2').value,
+    explain:document.getElementById('lp5E3').value,
+    elaborate:document.getElementById('lp5E4').value,
+    evaluate:document.getElementById('lp5E5').value,
+    differentiation:document.getElementById('lpDiff').value,
+    homework:document.getElementById('lpHW').value
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`lesson-${data.subject}-${(data.topic||'untitled').replace(/[^a-z0-9]/gi,'_')}.json`;
+  a.click();URL.revokeObjectURL(url);
+}
+renderPreview();
+
+const verbPool = document.getElementById('verbPool');
+const verbsByLvl = {1:bloom[1].verbs,2:bloom[2].verbs,3:bloom[3].verbs,4:bloom[4].verbs,5:bloom[5].verbs,6:bloom[6].verbs};
+let activeVerbLvl='all';
+function renderVerbs(){
+  let html='';
+  const lvls = activeVerbLvl==='all'?[1,2,3,4,5,6]:[parseInt(activeVerbLvl)];
+  lvls.forEach(l=>{
+    html += `<div style="margin-bottom:12px"><div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">L${l} · ${bloom[l].name}</div><div class="verb-chip-row">`;
+    verbsByLvl[l].forEach(v=>{
+      html += `<span class="verb-chip" style="cursor:pointer;border-color:${bloom[l].color};color:${bloom[l].color}" onclick="setVerb('${v}')">${v}</span>`;
+    });
+    html += `</div></div>`;
+  });
+  verbPool.innerHTML=html;
+}
+document.querySelectorAll('.verb-pill').forEach(p=>{
+  p.addEventListener('click',()=>{activeVerbLvl=p.dataset.vlvl;renderVerbs();});
+});
+renderVerbs();
+function setVerb(v){
+  document.getElementById('builtVerb').textContent=v;
+  updateObjPreview();
+}
+document.getElementById('objContext').addEventListener('input',updateObjPreview);
+function updateObjPreview(){
+  const v=document.getElementById('builtVerb').textContent;
+  const c=document.getElementById('objContext').value;
+  const verb = (v && v!=='…click a verb above') ? v : '…';
+  const ctx  = c ? c : '…';
+  document.getElementById('objPreview').textContent = `SWBAT ${verb} ${ctx}.`;
+}
+function copyObj(){
+  const text=document.getElementById('objPreview').textContent;
+  navigator.clipboard.writeText(text).then(()=>{
+    const old=document.getElementById('objPreview').textContent;
+    document.getElementById('objPreview').textContent='✓ Copied!';
+    setTimeout(()=>document.getElementById('objPreview').textContent=old,1200);
+  });
+}
+function resetObj(){
+  document.getElementById('builtVerb').textContent='…click a verb above';
+  document.getElementById('objContext').value='';
+  updateObjPreview();
+}
+
+const quiz = [
+  {q:'Which Bloom\'s level does the verb "design" belong to?',
+   o:['Remember','Apply','Analyze','Create'],a:3,
+   e:'"Design" is a HOTS verb at Level 6 — Create. It involves combining elements to make something original.'},
+  {q:'A teacher asks Cl 8 students: "Justify why dictatorship is unsuitable for India." This is which Bloom\'s level?',
+   o:['Understand','Apply','Evaluate','Create'],a:2,
+   e:'"Justify" requires defending a position with criteria and evidence — that\'s Level 5: Evaluate.'},
+  {q:'NEP 2020 mandates Foundational Literacy & Numeracy by the end of which class?',
+   o:['Class 1','Class 2','Class 3','Class 5'],a:2,
+   e:'NIPUN Bharat targets all children attaining FLN by the end of Class 3 (the foundational stage).'},
+  {q:'In the 5E Model, which "E" comes immediately before "Explain"?',
+   o:['Engage','Explore','Elaborate','Evaluate'],a:1,
+   e:'5E sequence: Engage → Explore → Explain → Elaborate → Evaluate. Students explore *before* the teacher explains — this is the inquiry move.'},
+  {q:'Which methodology is best suited for teaching a fixed mathematical algorithm to Cl 5 for the first time?',
+   o:['Inquiry-Based','Direct Instruction','Socratic Method','PBL'],a:1,
+   e:'Direct Instruction (I do → We do → You do) is most efficient for teaching procedures where exploration would cause errors.'},
+  {q:'NEP 2020\'s school structure is:',
+   o:['10+2','5+3+3+4','3+3+4','5+5+2'],a:1,
+   e:'5+3+3+4 — Foundational (5y) + Preparatory (3y) + Middle (3y) + Secondary (4y).'},
+  {q:'Which is NOT one of the 4Cs of 21st-century skills?',
+   o:['Critical Thinking','Creativity','Compliance','Collaboration'],a:2,
+   e:'The 4Cs are Critical Thinking, Creativity, Collaboration, Communication. Compliance is not a 21st-century skill.'},
+  {q:'Vygotsky\'s "Zone of Proximal Development" refers to:',
+   o:['What a child can do alone','What a child cannot do at all','The gap between what a child can do alone and with help','The age-appropriate curriculum'],a:2,
+   e:'ZPD is the sweet spot of learning — tasks just beyond independent ability but achievable with scaffolding.'},
+  {q:'A good lesson objective starts with:',
+   o:['"The teacher will explain..."','"Students will discuss..."','"SWBAT [action verb] [content]..."','"We will cover..."'],a:2,
+   e:'Objectives are about the learner\'s observable outcome — SWBAT (Students Will Be Able To) + an action verb + content.'},
+  {q:'Which assessment is FORMATIVE rather than summative?',
+   o:['Annual exam','Term test','Exit ticket','Board exam'],a:2,
+   e:'Exit tickets are formative — quick checks during/after a lesson to inform the next lesson. Term and annual exams are summative.'}
+];
+let qPos=0,qScore=0,qAns=Array(quiz.length).fill(null);
+function loadQ(){
+  const q=quiz[qPos];
+  document.getElementById('qIdx').textContent=`Question ${qPos+1} of ${quiz.length}`;
+  document.getElementById('qScore').textContent=`Score: ${qScore}`;
+  document.getElementById('qProg').style.width=((qPos+1)/quiz.length*100)+'%';
+  document.getElementById('qText').textContent=q.q;
+  document.getElementById('qExp').classList.remove('on');
+  document.getElementById('qExp').textContent='';
+  const opts=document.getElementById('qOpts');opts.innerHTML='';
+  q.o.forEach((opt,i)=>{
+    const b=document.createElement('button');
+    b.className='quiz-opt';b.textContent=opt;
+    if(qAns[qPos]!==null){
+      if(i===q.a)b.classList.add('right');
+      if(i===qAns[qPos] && i!==q.a)b.classList.add('wrong');
+      b.disabled=true;
+    } else {
+      b.onclick=()=>chooseOpt(i);
+    }
+    opts.appendChild(b);
+  });
+  if(qAns[qPos]!==null){
+    document.getElementById('qExp').textContent=q.e;
+    document.getElementById('qExp').classList.add('on');
+  }
+  document.getElementById('qPrev').disabled=(qPos===0);
+  document.getElementById('qNext').textContent=(qPos===quiz.length-1)?'See Final Score':'Next →';
+}
+function chooseOpt(i){
+  const q=quiz[qPos];
+  qAns[qPos]=i;
+  if(i===q.a)qScore++;
+  loadQ();
+}
+function qNext(){
+  if(qPos===quiz.length-1){showResult();return}
+  qPos++;loadQ();
+}
+function qPrev(){if(qPos>0){qPos--;loadQ()}}
+function qReset(){
+  qPos=0;qScore=0;qAns=Array(quiz.length).fill(null);
+  document.getElementById('quizCard').innerHTML=`
+    <div class="progress"><div id="qProg" style="width:10%"></div></div>
+    <div class="quiz-meta"><span id="qIdx">Question 1 of 10</span><span id="qScore">Score: 0</span></div>
+    <p class="quiz-q" id="qText"></p>
+    <div class="quiz-opts" id="qOpts"></div>
+    <div class="quiz-explain" id="qExp"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="qPrev" onclick="qPrev()">← Previous</button>
+      <button class="btn teal" id="qNext" onclick="qNext()">Next →</button>
+      <button class="btn ghost" onclick="qReset()">↺ Restart</button>
+    </div>`;
+  loadQ();
+}
+function showResult(){
+  const card=document.getElementById('quizCard');
+  let band='';
+  if(qScore===10)band='<b style="color:#16a34a">🏆 Mastery</b> — you can lead the next pedagogy session for the staff!';
+  else if(qScore>=7)band='<b style="color:#0d9488">✓ Solid grasp</b> — you\'re ready to plan with confidence.';
+  else band='<b style="color:#e11d48">📖 Needs revision</b> — revisit the Bloom\'s and NEP tabs.';
+  card.innerHTML=`
+    <h3 style="margin:0 0 10px;color:var(--navy);font-size:22px">Your Score: ${qScore} / 10</h3>
+    <p style="font-size:15px;color:var(--ink-2)">${band}</p>
+    <div class="btn-row">
+      <button class="btn teal" onclick="qReset()">↺ Try Again</button>
+      <button class="btn ghost" onclick="goTab('bloom')">→ Review Bloom's</button>
+      <button class="btn ghost" onclick="goTab('nep')">→ Review NEP 2020</button>
+      <button class="btn ghost" onclick="goTab('methods')">→ Review Methodologies</button>
+    </div>
+  `;
+}
+loadQ();
+</script>
+</body>
+</html>
