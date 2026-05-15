@@ -1357,6 +1357,8 @@ const HOW_TO=[
   ]},
   {cat:'Building the Timetable',color:'#6d28d9',items:[
     {q:'How do I auto-fill a class\'s week?',a:['Open <strong>Timetable</strong> → select the class → click <strong>Auto-fill</strong>. The solver respects teacher clashes across classes, the weekly max-periods cap, the default first-subject-of-day, and each day\'s category period grid.','If it can\'t satisfy all constraints it tells you how many slots were placed without a teacher so you can fix them manually.']},
+    {q:'Why do lecture-based teachers get back-to-back periods?',a:['Visiting / part-time faculty (anyone marked <code>teacherType = lecture_based</code> on their Faculty profile) should ideally come in once and teach a block, not be scattered across the day. Auto-fill now keeps them on for as long as their pool of lectures lasts, provided the next teaching period starts exactly when the previous one ended.','A recess, break, or any gap in the period grid ends the consecutive run. Their <code>availFrom / availTo</code> window is still respected.']},
+    {q:'Why does Std 1-4 auto-fill leave some slots empty?',a:['Junior classes have a daily variety cap so the kids don\'t see too many topics in one day: Std 1 &amp; 2 are limited to <strong>2 distinct regular subjects + 1 optional</strong> per day, Std 3 to <strong>3 + 1</strong>, and Std 4 to <strong>4 + 1</strong>.','"Optional" means anything in the Graded or Activity subgroup (PT, Art, Computer, Library, Craft, Music, etc.) — see the Subjects tab.','A subject may repeat across multiple periods of the same day; the cap only limits how many <em>different</em> subjects appear. If the solver runs out of cap-friendly choices for a slot it leaves the cell empty and tells you the count after the run.']},
     {q:'Why does Wednesday show a different period grid than Monday?',a:['Because Wednesday is in the Activity category by default. Timetable Builder renders each day-category as its own sub-grid using that category\'s periods from Day Structure.','Rearrange the category assignment in Day Structure → Working Days → Activity Days.']},
     {q:'Red dot vs yellow dot on a cell — what\'s the difference?',a:['<span style="color:var(--danger);font-weight:600">Red</span> = the same teacher is already teaching another class at this exact time (teacher clash).','<span style="color:#b45309;font-weight:600">Yellow</span> = the same room is booked for another class at this time (room clash).']}
   ]},
@@ -2243,6 +2245,30 @@ function TimetablePage({data,update}){
     const classTeacherId=cls?cls.classTeacherId:null;
     const firstPosPerDay={};
     positions.forEach(pos=>{if(firstPosPerDay[pos.dIdx]===undefined)firstPosPerDay[pos.dIdx]=pos;});
+    // Std 1-4 daily-variety cap: N distinct regular subjects + 1 optional (graded/activity) per day.
+    const DAILY_REGULAR_CAP={1:2,2:2,3:3,4:4};
+    const dayCap=DAILY_REGULAR_CAP[cls&&cls.grade]||null;
+    const subjGroupOf=sId=>{const s=data.subjects.find(x=>x.id===sId);return s&&s.subGroup?s.subGroup:'regular';};
+    const dayReg={};const dayOpt={};
+    const canPlace=(sId,dIdx)=>{
+      if(!dayCap) return true;
+      if(subjGroupOf(sId)==='regular'){
+        const set=dayReg[dIdx]||new Set();
+        return set.has(sId)||set.size<dayCap;
+      }
+      return (dayOpt[dIdx]||0)<1;
+    };
+    const noteDay=(sId,dIdx)=>{
+      if(!dayCap) return;
+      if(subjGroupOf(sId)==='regular'){if(!dayReg[dIdx])dayReg[dIdx]=new Set();dayReg[dIdx].add(sId);}
+      else dayOpt[dIdx]=(dayOpt[dIdx]||0)+1;
+    };
+    let capSkipped=0;
+    // Lecture-based teachers prefer consecutive periods. Track the last teacher placed per day; if
+    // the next teaching position starts exactly where the previous one ended and the same teacher
+    // still has pool items left, extend their block before considering anyone else.
+    const lastByDay={};
+    const isLectureBased=tId=>{const t=data.teachers.find(x=>x.id===tId);return !!(t&&t.teacherType==='lecture_based');};
 
     positions.forEach(({dIdx,pIdx,start,end})=>{
       const busyKey=dIdx+'|'+start+'|'+end;
@@ -2250,56 +2276,71 @@ function TimetablePage({data,update}){
       const selfBusy=placed[busyKey]||new Set();
       // First teaching period of each day
       const isFirstPeriod=firstPosPerDay[dIdx]&&firstPosPerDay[dIdx].pIdx===pIdx;
+      const teacherOk=item=>!item.teacherId||(!busySet.has(item.teacherId)&&!selfBusy.has(item.teacherId)&&isTeacherAvailable(item.teacherId,start,end));
+      const placeFrom=idx=>{
+        const item=poolCopy.splice(idx,1)[0];
+        if(!tt[classId][dIdx]) tt[classId][dIdx]={};
+        tt[classId][dIdx][pIdx]={subjectId:item.subjectId,teacherId:item.teacherId,roomId:null};
+        if(item.teacherId){if(!placed[busyKey])placed[busyKey]=new Set();placed[busyKey].add(item.teacherId);}
+        noteDay(item.subjectId,dIdx);
+        lastByDay[dIdx]={teacherId:item.teacherId,end};
+        return item;
+      };
       // (a) Explicit class default first-subject takes top priority
       if(isFirstPeriod&&firstSubjectId&&poolCopy.length>0){
-        const fsIdx=poolCopy.findIndex(item=>item.subjectId===firstSubjectId&&(!item.teacherId||(!busySet.has(item.teacherId)&&!selfBusy.has(item.teacherId)&&isTeacherAvailable(item.teacherId,start,end))));
-        if(fsIdx!==-1){
-          const item=poolCopy.splice(fsIdx,1)[0];
-          if(!tt[classId][dIdx]) tt[classId][dIdx]={};
-          tt[classId][dIdx][pIdx]={subjectId:item.subjectId,teacherId:item.teacherId,roomId:null};
-          if(item.teacherId){if(!placed[busyKey])placed[busyKey]=new Set();placed[busyKey].add(item.teacherId);}
-          return;
-        }
+        const fsIdx=poolCopy.findIndex(item=>item.subjectId===firstSubjectId&&teacherOk(item)&&canPlace(item.subjectId,dIdx));
+        if(fsIdx!==-1){placeFrom(fsIdx);return;}
         // If no pool entry matched (e.g. firstSubject isn't allocated), fall through to class-teacher logic
       }
       // (b) Otherwise prefer a subject taught by the class teacher
       if(isFirstPeriod&&classTeacherId&&poolCopy.length>0){
-        const ctIdx=poolCopy.findIndex(item=>item.teacherId===classTeacherId&&!busySet.has(item.teacherId)&&!selfBusy.has(item.teacherId)&&isTeacherAvailable(item.teacherId,start,end));
-        if(ctIdx!==-1){
-          const item=poolCopy.splice(ctIdx,1)[0];
-          if(!tt[classId][dIdx]) tt[classId][dIdx]={};
-          tt[classId][dIdx][pIdx]={subjectId:item.subjectId,teacherId:item.teacherId,roomId:null};
-          if(item.teacherId){if(!placed[busyKey])placed[busyKey]=new Set();placed[busyKey].add(item.teacherId);}
-          return;
-        }
+        const ctIdx=poolCopy.findIndex(item=>item.teacherId===classTeacherId&&!busySet.has(item.teacherId)&&!selfBusy.has(item.teacherId)&&isTeacherAvailable(item.teacherId,start,end)&&canPlace(item.subjectId,dIdx));
+        if(ctIdx!==-1){placeFrom(ctIdx);return;}
       }
-      // Find first item from pool whose teacher is NOT busy and is available
+      // (c) Lecture-based teacher continuity: if the previous teaching period on this day ended at
+      //     this slot's start and used a lecture-based teacher, keep them on if they have more.
+      const prev=lastByDay[dIdx];
+      if(prev&&prev.teacherId&&prev.end===start&&isLectureBased(prev.teacherId)){
+        const contIdx=poolCopy.findIndex(item=>item.teacherId===prev.teacherId&&teacherOk(item)&&canPlace(item.subjectId,dIdx));
+        if(contIdx!==-1){placeFrom(contIdx);return;}
+      }
+      // Find first item from pool whose teacher is NOT busy AND that respects the day-variety cap.
+      // Prefer lecture-based teachers so their lectures cluster together in the schedule.
       let found=-1;
       for(let i=0;i<poolCopy.length;i++){
         const item=poolCopy[i];
-        if(!item.teacherId || (!busySet.has(item.teacherId)&&!selfBusy.has(item.teacherId)&&isTeacherAvailable(item.teacherId,start,end))){
-          found=i;break;
+        if(teacherOk(item)&&canPlace(item.subjectId,dIdx)&&item.teacherId&&isLectureBased(item.teacherId)){found=i;break;}
+      }
+      if(found===-1){
+        for(let i=0;i<poolCopy.length;i++){
+          const item=poolCopy[i];
+          if(teacherOk(item)&&canPlace(item.subjectId,dIdx)){found=i;break;}
         }
       }
       if(found===-1){
-        if(poolCopy.length>0){
-          const item=poolCopy.splice(0,1)[0];
-          if(!tt[classId][dIdx]) tt[classId][dIdx]={};
-          tt[classId][dIdx][pIdx]={subjectId:item.subjectId,teacherId:null,roomId:null};
-          skipped++;
+        // Cap-friendly item not available. Try ignoring the cap so we don't waste the slot — but only if
+        // no cap is set, otherwise leave the slot empty rather than violate Std 1-4 variety rule.
+        if(!dayCap){
+          if(poolCopy.length>0){
+            const item=poolCopy.splice(0,1)[0];
+            if(!tt[classId][dIdx]) tt[classId][dIdx]={};
+            tt[classId][dIdx][pIdx]={subjectId:item.subjectId,teacherId:null,roomId:null};
+            skipped++;
+            lastByDay[dIdx]={teacherId:null,end};
+          }
+        } else {
+          capSkipped++;
+          lastByDay[dIdx]={teacherId:null,end};
         }
         return;
       }
-      const item=poolCopy.splice(found,1)[0];
-      if(!tt[classId][dIdx]) tt[classId][dIdx]={};
-      tt[classId][dIdx][pIdx]={subjectId:item.subjectId,teacherId:item.teacherId,roomId:null};
-      if(item.teacherId){
-        if(!placed[busyKey]) placed[busyKey]=new Set();
-        placed[busyKey].add(item.teacherId);
-      }
+      placeFrom(found);
     });
     update({timetable:tt});
-    if(skipped>0) alert(skipped+' slot(s) had all teachers busy — placed subject without teacher. Review manually.');
+    const msgs=[];
+    if(skipped>0) msgs.push(skipped+' slot(s) had all teachers busy — placed subject without teacher.');
+    if(capSkipped>0) msgs.push(capSkipped+' slot(s) left empty to respect the Std '+(cls&&cls.grade)+' daily variety cap ('+dayCap+' regular subjects + 1 optional). Add allocations or relax the rule manually.');
+    if(msgs.length) alert(msgs.join('\n'));
   };
 
   const clsOpts=sortClasses(data.classes).map(c=>({value:c.id,label:c.name+' ('+(c.group==='preprimary'?'Pre-Pri':c.group==='upper'?'Upper':'Primary')+')'}));
@@ -2848,7 +2889,16 @@ function RulesPage({data}){
       <Rule n="04" title="Teacher max periods per week">The hard ceiling is <strong>{nonPrincipals.length?maxValues.join(' / '):42}</strong> periods for non-principal staff and {Principal?Principal.maxPeriods:10} for the Principal. Auto-fill stops placing a teacher once this cap is reached for the week, across every class.</Rule>
       <Rule n="05" title="First period of each day">Priority order: (a) the class's <strong>Default First Subject</strong> from the Classes tab, (b) a subject taught by the <strong>Class Teacher</strong>, (c) the next available item from the shuffled pool. The Default First Subject is filtered by the class teacher's qualified subjects.</Rule>
       <Rule n="06" title="Lecture-based availability window">Teachers with <code>teacherType = 'lecture_based'</code> and an <code>availFrom / availTo</code> window are only considered for slots that fit inside that window — useful for visiting or part-time faculty.</Rule>
+      <Rule n="06b" title="Lecture-based teachers cluster consecutively">When a lecture-based teacher is placed and the next teaching period on that day starts <em>exactly</em> where the previous one ended, the solver keeps them on first — so a visiting faculty's periods land back-to-back instead of being scattered across the day. Lecture-based pool entries also get first pick in the generic placement pass so their blocks form even on the first period of a day. A recess, break, or any gap between periods ends the consecutive run.</Rule>
       <Rule n="07" title="Fallback placement">If no eligible teacher is free for a slot, the solver still places the subject in that slot but leaves <code>teacherId</code> null. After the run it alerts how many slots were placed without a teacher so you can fix them manually.</Rule>
+      <Rule n="07b" title="Std 1-4 daily variety cap">Junior classes get a hard cap on how many <em>distinct</em> subjects appear in one day, so little kids aren't whiplashed between topics:
+        <ul style={{margin:'6px 0 0 18px',padding:0}}>
+          <li><strong>Std 1 &amp; 2</strong> — at most <strong>2</strong> regular subjects + <strong>1</strong> optional (graded/activity) per day.</li>
+          <li><strong>Std 3</strong> — at most <strong>3</strong> regular subjects + <strong>1</strong> optional per day.</li>
+          <li><strong>Std 4</strong> — at most <strong>4</strong> regular subjects + <strong>1</strong> optional per day.</li>
+        </ul>
+        A subject may still repeat across multiple periods of the same day — the cap counts <em>distinct</em> subjects, not periods. "Optional" means anything in the Graded or Activity subgroup (PT, Art, Computer, Library, Craft, Music, etc.). If the solver can't satisfy the cap for a slot, it leaves the slot empty rather than violate the rule and reports the count in the post-run alert.
+      </Rule>
     </div>
     <div className="card">
       <div className="card-title">Live conflict checks (Timetable Builder)</div>
@@ -2881,7 +2931,7 @@ function RulesPage({data}){
     <div className="card" style={{background:'var(--bg)'}}>
       <div className="card-title">What the tool does NOT enforce</div>
       <ul style={{paddingLeft:20,fontSize:13,color:'var(--ink-soft)',lineHeight:1.8}}>
-        <li>Hard caps on repeated subjects per day (you can stack the same subject back-to-back if the allocation allows).</li>
+        <li>Hard caps on repeated subjects per day for Std 5+ (you can stack the same subject back-to-back if the allocation allows). Std 1-4 have a distinct-subject cap — see rule 07b.</li>
         <li>Lab / paired-period blocks — double-period labs must be arranged manually.</li>
         <li>Teacher personal preferences (e.g. "no periods on Wednesday morning") unless modeled via the lecture-based availability window.</li>
         <li>Break-time supervision duty rosters — proxy slips cover absence only.</li>
